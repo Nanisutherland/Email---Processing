@@ -1,0 +1,88 @@
+/* ============================================
+   Global Styles - Outlook Email Processing
+   ============================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --outlook-blue: #0078D4;
+  --outlook-dark-blue: #106EBE;
+  --outlook-light-blue: #DEECF9;
+  --outlook-hover-blue: #C7E0F4;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f2f1;
+  --bg-tertiary: #edebe9;
+  --text-primary: #323130;
+  --text-secondary: #605e5c;
+  --text-tertiary: #a19f9d;
+  --border-color: #e1dfdd;
+  --border-light: #f3f2f1;
+  --red-accent: #d13438;
+  --green-accent: #107c10;
+  --orange-accent: #ff8c00;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 3px 8px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.2);
+  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html, body {
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+button {
+  font-family: var(--font-family);
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: inherit;
+}
+
+input, textarea {
+  font-family: var(--font-family);
+  font-size: inherit;
+}
+
+a {
+  color: var(--outlook-blue);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c8c6c4;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a19f9d;
+}
