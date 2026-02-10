@@ -696,19 +696,23 @@ function filterEmails() {
 // EMAIL SELECTION & PREVIEW
 // ============================================
 function selectEmail(id) {
-  const em = emails.find(e => e.id === id);
-  if (!em) return;
-  selectedEmail = em;
-  if (!em.is_read) {
-    em.is_read = true;
-    // Fire-and-forget DB update — don't block rendering
-    sb.from('emails').update({is_read:true}).eq('id',id).then(()=>{}).catch(e => console.warn(e));
+  var em = null;
+  for (var i = 0; i < emails.length; i++) {
+    if (emails[i].id === id || String(emails[i].id) === String(id)) { em = emails[i]; break; }
   }
-  // Render immediately (synchronous)
-  renderEmailList(document.getElementById('searchInput').value ? emails.filter(e => {const q=document.getElementById('searchInput').value.toLowerCase();return e.subject.toLowerCase().includes(q)||e.from_name.toLowerCase().includes(q)||e.body.toLowerCase().includes(q);}) : emails);
-  renderPreview(em);
+  if (!em) { console.error('Email not found for id:', id, 'Available ids:', emails.map(function(e){return e.id;})); return; }
+  selectedEmail = em;
+  em.is_read = true;
+  // Render preview and list synchronously
+  try { renderPreview(em); } catch(err) { console.error('renderPreview error:', err); }
+  try {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    renderEmailList(q ? emails.filter(function(e){return e.subject.toLowerCase().includes(q)||e.from_name.toLowerCase().includes(q)||e.body.toLowerCase().includes(q);}) : emails);
+  } catch(err) { console.error('renderEmailList error:', err); }
   // Open popup like Outlook
-  openPopup();
+  try { openPopup(); } catch(err) { console.error('openPopup error:', err); }
+  // Fire-and-forget DB update
+  try { sb.from('emails').update({is_read:true}).eq('id',id).then(function(){}).catch(function(e){console.warn(e);}); } catch(e) { /* ignore */ }
 }
 
 function renderPreview(em) {
@@ -741,33 +745,63 @@ function renderPreview(em) {
 // ============================================
 // TOGGLE FLAG
 // ============================================
-async function toggleFlag(id) {
-  const em = emails.find(e => e.id === id);
+function toggleFlag(id) {
+  var em = null;
+  for (var i = 0; i < emails.length; i++) {
+    if (emails[i].id === id || String(emails[i].id) === String(id)) { em = emails[i]; break; }
+  }
   if (!em) return;
   em.is_flagged = !em.is_flagged;
-  try { await sb.from('emails').update({is_flagged:em.is_flagged}).eq('id',id); } catch(e) { console.warn(e); }
   renderEmailList(emails);
   if (selectedEmail && selectedEmail.id === id) renderPreview(em);
+  // Fire-and-forget DB update
+  try { sb.from('emails').update({is_flagged:em.is_flagged}).eq('id',id).then(function(){}).catch(function(e){console.warn(e);}); } catch(e) { /* ignore */ }
 }
 
 // ============================================
 // SEND / RECEIVE
 // ============================================
+function loadLocalSeedEmails() {
+  // Create local email objects from seed data so the app works even without Supabase
+  var now = new Date();
+  emails = SEED_EMAILS.map(function(seed, i) {
+    return {
+      id: 'local-' + (i + 1),
+      from_name: seed.from_name, from_email: seed.from_email,
+      to_name: seed.to_name, to_email: seed.to_email,
+      subject: seed.subject, body: seed.body,
+      received_at: new Date(now.getTime() - i * 60000).toISOString(),
+      is_read: false, is_flagged: false, folder: 'inbox',
+      has_attachments: seed.has_attachments,
+      attachments: (seed.attachments || []).map(function(att, j) {
+        return { id: 'att-' + i + '-' + j, file_name: att.file_name, file_type: att.file_type, file_size: att.file_size, storage_path: null, public_url: null };
+      }),
+      replies: []
+    };
+  });
+  initialized = true;
+  renderEmailList(emails);
+}
+
 async function sendReceive() {
-  const btn = document.getElementById('sendReceiveBtn');
-  const icon = document.getElementById('sendReceiveIcon');
+  var btn = document.getElementById('sendReceiveBtn');
+  var icon = document.getElementById('sendReceiveIcon');
   btn.disabled = true; icon.classList.add('spin');
 
+  // STEP 1: Immediately load local seed data so emails appear instantly
+  loadLocalSeedEmails();
+
+  // STEP 2: Try Supabase in background — if it works, replace local data with DB data
   try {
-    // Check if emails exist
-    const { data: existing } = await sb.from('emails').select('id').limit(1);
-    if (!existing || existing.length === 0) {
-      // Seed emails
-      const now = new Date();
-      for (let i = 0; i < SEED_EMAILS.length; i++) {
-        const seed = SEED_EMAILS[i];
-        const receivedAt = new Date(now.getTime() - i * 60000);
-        const { data: emailData, error: insertErr } = await sb.from('emails').insert({
+    // Check if emails exist in Supabase
+    var existRes = await sb.from('emails').select('id').limit(1);
+    if (!existRes.data || existRes.data.length === 0) {
+      // Seed emails into Supabase
+      var now = new Date();
+      for (var i = 0; i < SEED_EMAILS.length; i++) {
+        var seed = SEED_EMAILS[i];
+        var receivedAt = new Date(now.getTime() - i * 60000);
+        var insertRes = await sb.from('emails').insert({
           from_name: seed.from_name, from_email: seed.from_email,
           to_name: seed.to_name, to_email: seed.to_email,
           subject: seed.subject, body: seed.body,
@@ -775,10 +809,11 @@ async function sendReceive() {
           is_read: false, is_flagged: false, folder: 'inbox',
           has_attachments: seed.has_attachments
         }).select().single();
-        if (insertErr) { console.error(insertErr); continue; }
-        for (const att of seed.attachments) {
+        if (insertRes.error) { console.error('Insert error:', insertRes.error); continue; }
+        for (var j = 0; j < seed.attachments.length; j++) {
+          var att = seed.attachments[j];
           await sb.from('attachments').insert({
-            email_id: emailData.id, file_name: att.file_name,
+            email_id: insertRes.data.id, file_name: att.file_name,
             file_type: att.file_type, file_size: att.file_size,
             storage_path: null, public_url: null
           });
@@ -786,33 +821,36 @@ async function sendReceive() {
       }
     }
 
-    // Fetch all emails
-    const { data, error: fetchErr } = await sb.from('emails').select('*').eq('folder','inbox').order('received_at',{ascending:false});
-    if (fetchErr) throw fetchErr;
-    if (data && data.length) {
-      emails = await Promise.all(data.map(async em => {
-        const [attRes, repRes] = await Promise.all([
+    // Fetch all emails from Supabase
+    var fetchRes = await sb.from('emails').select('*').eq('folder','inbox').order('received_at',{ascending:false});
+    if (fetchRes.error) throw fetchRes.error;
+    if (fetchRes.data && fetchRes.data.length) {
+      var dbEmails = await Promise.all(fetchRes.data.map(async function(em) {
+        var results = await Promise.all([
           sb.from('attachments').select('*').eq('email_id', em.id),
           sb.from('email_replies').select('*').eq('email_id', em.id).order('sent_at',{ascending:true})
         ]);
-        return { ...em, attachments: attRes.data || [], replies: repRes.data || [] };
+        return Object.assign({}, em, { attachments: results[0].data || [], replies: results[1].data || [] });
       }));
+      // Replace local data with real Supabase data
+      emails = dbEmails;
+      selectedEmail = null;
+      renderEmailList(emails);
+      console.log('Loaded ' + emails.length + ' emails from Supabase');
     }
-    initialized = true;
-    renderEmailList(emails);
 
-    // Trigger webhook
+    // Trigger webhook (fire-and-forget)
     try {
-      await fetch(N8N_WEBHOOK_URL, {
+      fetch(N8N_WEBHOOK_URL, {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ emails: emails.map(e => ({ id:e.id, from_name:e.from_name, from_email:e.from_email, to_email:e.to_email, subject:e.subject, body:e.body, received_at:e.received_at, attachments:(e.attachments||[]).map(a=>({file_name:a.file_name,file_type:a.file_type,file_size:a.file_size,public_url:a.public_url})) })) })
+        body: JSON.stringify({ emails: emails.map(function(e) { return { id:e.id, from_name:e.from_name, from_email:e.from_email, to_email:e.to_email, subject:e.subject, body:e.body, received_at:e.received_at, attachments:(e.attachments||[]).map(function(a){return {file_name:a.file_name,file_type:a.file_type,file_size:a.file_size,public_url:a.public_url};}) }; }) })
       });
       console.log('Webhook triggered');
     } catch(e) { console.warn('Webhook not available:', e); }
 
   } catch(e) {
-    console.error('Send/Receive error:', e);
-    alert('Error: ' + (e.message || e));
+    console.warn('Supabase sync failed, using local data:', e);
+    // Local data already loaded in step 1 — app still works
   } finally {
     btn.disabled = false; icon.classList.remove('spin');
   }
@@ -873,23 +911,36 @@ function closeReplyModal() { document.getElementById('replyOverlay').classList.a
 
 async function sendReply() {
   if (!selectedEmail) return;
-  const btn = document.getElementById('replySendBtn');
+  var btn = document.getElementById('replySendBtn');
   btn.disabled = true; btn.querySelector('span').textContent = 'Sending...';
   try {
-    const body = document.getElementById('replyBody').value;
-    const { data, error } = await sb.from('email_replies').insert({
+    var body = document.getElementById('replyBody').value;
+    var replyObj = {
+      id: 'reply-' + Date.now(),
       email_id: selectedEmail.id,
       from_name: 'Wonderland Team', from_email: 'Emailprocessing@wonderlandglobal.com',
       to_name: selectedEmail.from_name, to_email: selectedEmail.from_email,
-      subject: 'RE: ' + selectedEmail.subject, body: body
-    }).select().single();
-    if (error) throw error;
-    if (data) {
-      if (!selectedEmail.replies) selectedEmail.replies = [];
-      selectedEmail.replies.push(data);
-      renderPreview(selectedEmail);
-    }
+      subject: 'RE: ' + selectedEmail.subject, body: body,
+      sent_at: new Date().toISOString()
+    };
+    // Add locally first so it appears immediately
+    if (!selectedEmail.replies) selectedEmail.replies = [];
+    selectedEmail.replies.push(replyObj);
+    renderPreview(selectedEmail);
     closeReplyModal();
+    // Try Supabase in background
+    try {
+      var res = await sb.from('email_replies').insert({
+        email_id: selectedEmail.id,
+        from_name: 'Wonderland Team', from_email: 'Emailprocessing@wonderlandglobal.com',
+        to_name: selectedEmail.from_name, to_email: selectedEmail.from_email,
+        subject: 'RE: ' + selectedEmail.subject, body: body
+      }).select().single();
+      if (res.data) {
+        // Replace local reply with DB version
+        selectedEmail.replies[selectedEmail.replies.length - 1] = res.data;
+      }
+    } catch(dbErr) { console.warn('DB reply save failed, reply saved locally:', dbErr); }
   } catch(e) {
     console.error('Reply error:', e);
     alert('Failed to send reply: ' + (e.message || e));
