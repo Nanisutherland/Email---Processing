@@ -6,9 +6,6 @@
 <title>Outlook - Email Processing</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
-/* ============================================
-   RESET & VARIABLES
-   ============================================ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
   --outlook-blue: #0078D4;
@@ -40,9 +37,7 @@ a { color: var(--outlook-blue); text-decoration: none; }
 ::-webkit-scrollbar-thumb { background: #c8c6c4; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #a19f9d; }
 
-/* ============================================
-   LOGIN PAGE
-   ============================================ */
+/* LOGIN */
 .login-container { display: flex; height: 100vh; width: 100vw; }
 .login-left { flex: 1; background: linear-gradient(135deg, #0078D4 0%, #106EBE 50%, #004E8C 100%); display: flex; align-items: center; justify-content: center; padding: 3rem; color: white; }
 .login-branding { max-width: 400px; text-align: center; }
@@ -76,14 +71,10 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .login-footer { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); text-align: center; }
 .login-footer p { font-size: 0.75rem; color: var(--text-tertiary); }
 
-/* ============================================
-   MAIN LAYOUT
-   ============================================ */
+/* MAIN LAYOUT */
 .main-layout { display: none; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; background: var(--bg-primary); }
 .main-layout.active { display: flex; }
 .login-container.hidden { display: none; }
-
-/* App Header */
 .app-header { display: flex; align-items: center; justify-content: space-between; height: 48px; background: var(--outlook-blue); color: white; padding: 0 16px; flex-shrink: 0; }
 .header-left { display: flex; align-items: center; gap: 8px; }
 .app-title { font-size: 1rem; font-weight: 600; }
@@ -96,7 +87,7 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .header-icon-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: white; transition: background 0.2s; }
 .header-icon-btn:hover { background: rgba(255,255,255,0.15); }
 
-/* Toolbar */
+/* TOOLBAR */
 .toolbar { display: flex; align-items: center; justify-content: space-between; height: 44px; background: var(--bg-primary); border-bottom: 1px solid var(--border-color); padding: 0 8px; flex-shrink: 0; }
 .toolbar-left { display: flex; align-items: center; gap: 2px; }
 .toolbar-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 4px; color: var(--text-primary); font-size: 0.82rem; white-space: nowrap; transition: background 0.15s; }
@@ -110,14 +101,16 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .search-bar:focus-within { border-color: var(--outlook-blue); box-shadow: 0 0 0 1px var(--outlook-blue); background: white; }
 .search-bar svg { color: var(--text-tertiary); flex-shrink: 0; }
 .search-bar input { border: none; background: transparent; outline: none; flex: 1; font-size: 0.85rem; color: var(--text-primary); }
-
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 
-/* Content Area */
-.content-area { display: flex; flex: 1; overflow: hidden; }
+/* PROGRESS BAR */
+.send-receive-progress { height: 3px; background: var(--outlook-light-blue); position: relative; overflow: hidden; display: none; }
+.send-receive-progress.active { display: block; }
+.send-receive-progress .bar { height: 100%; background: var(--outlook-blue); width: 0%; transition: width 0.3s linear; }
 
-/* Sidebar */
+/* CONTENT */
+.content-area { display: flex; flex: 1; overflow: hidden; }
 .sidebar { width: 220px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); overflow-y: auto; flex-shrink: 0; }
 .sidebar-account { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border-color); }
 .account-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--outlook-blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; }
@@ -135,7 +128,7 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .folder-name { flex: 1; }
 .folder-count { font-size: 0.75rem; font-weight: 600; color: var(--outlook-blue); }
 
-/* Email List */
+/* EMAIL LIST */
 .email-list { width: 360px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; background: var(--bg-primary); flex-shrink: 0; }
 .email-list-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
 .email-list-header h3 { font-size: 1rem; font-weight: 600; }
@@ -167,13 +160,13 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .flag-btn:hover { color: var(--orange-accent); background: rgba(255,140,0,0.1); }
 .flag-btn.flagged { color: var(--orange-accent); }
 
-/* Email Preview */
+/* EMAIL PREVIEW */
 .email-preview { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-primary); }
 .email-preview.empty { align-items: center; justify-content: center; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--text-tertiary); }
 .empty-state p { font-size: 1rem; }
-.preview-content-wrapper { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.preview-content-wrapper.hidden-content { display: none; }
+.preview-content-area { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.preview-content-area.visible { display: flex; }
 .preview-header { display: flex; align-items: center; justify-content: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
 .preview-actions { display: flex; gap: 2px; }
 .preview-action-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 4px; color: var(--text-primary); font-size: 0.82rem; transition: background 0.15s; }
@@ -204,8 +197,6 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .att-size { display: block; font-size: 0.72rem; color: var(--text-tertiary); }
 .preview-body { line-height: 1.6; color: var(--text-primary); font-size: 0.9rem; }
 .preview-body p { margin-bottom: 0.25rem; }
-
-/* Replies */
 .preview-replies { margin-top: 24px; border-top: 2px solid var(--outlook-blue); padding-top: 16px; }
 .replies-divider span { font-size: 0.85rem; font-weight: 600; color: var(--outlook-blue); }
 .reply-item { padding: 16px; background: #f0f8ff; border-radius: 8px; border-left: 3px solid var(--outlook-blue); margin-top: 12px; }
@@ -213,16 +204,14 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .reply-body-text { margin-top: 12px; font-size: 0.88rem; line-height: 1.6; color: var(--text-primary); }
 .reply-body-text p { margin-bottom: 0.25rem; }
 
-/* Status Bar */
+/* STATUS BAR */
 .status-bar { display: flex; align-items: center; justify-content: space-between; height: 28px; background: var(--bg-secondary); border-top: 1px solid var(--border-color); padding: 0 16px; font-size: 0.72rem; color: var(--text-secondary); flex-shrink: 0; }
 .status-left, .status-right { display: flex; align-items: center; gap: 4px; }
 .status-separator { color: var(--border-color); margin: 0 4px; }
 
-/* ============================================
-   POPUP OVERLAY
-   ============================================ */
+/* POPUP */
 .popup-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.2s ease; }
-.popup-overlay.hidden { display: none; }
+.popup-overlay.hidden { display: none !important; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .popup-window { width: 90vw; max-width: 900px; height: 85vh; background: white; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden; animation: slideUp 0.25s ease; }
@@ -260,7 +249,7 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .popup-reply-body { margin-top: 12px; font-size: 0.9rem; line-height: 1.6; }
 .popup-reply-body p { margin-bottom: 0.25rem; }
 
-/* Reply Modal */
+/* REPLY MODAL */
 .reply-modal { width: 680px; max-height: 80vh; background: white; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow: hidden; animation: slideUp 0.25s ease; }
 .reply-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
 .reply-modal-header h3 { font-size: 1rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 12px; }
@@ -278,16 +267,13 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .reply-cancel-btn { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem; color: var(--text-secondary); margin-left: auto; transition: all 0.15s; }
 .reply-cancel-btn:hover { background: var(--bg-secondary); }
 
-/* Responsive */
 @media (max-width: 1200px) { .sidebar { width: 180px; } .email-list { width: 300px; } }
 @media (max-width: 900px) { .sidebar { display: none; } .email-list { width: 260px; } .toolbar-btn span { display: none; } .toolbar-btn.primary span { display: inline; } }
 </style>
 </head>
 <body>
 
-<!-- ============================================
-     LOGIN PAGE
-     ============================================ -->
+<!-- LOGIN PAGE -->
 <div id="loginPage" class="login-container">
   <div class="login-left">
     <div class="login-branding">
@@ -332,11 +318,8 @@ a { color: var(--outlook-blue); text-decoration: none; }
   </div>
 </div>
 
-<!-- ============================================
-     MAIN LAYOUT
-     ============================================ -->
+<!-- MAIN LAYOUT -->
 <div id="mainLayout" class="main-layout">
-  <!-- Header -->
   <div class="app-header">
     <div class="header-left">
       <svg viewBox="0 0 48 48" width="24" height="24"><rect x="2" y="6" width="44" height="36" rx="3" fill="#fff"/><path d="M24 14L6 24l18 10 18-10L24 14z" fill="#fff" opacity="0.3"/></svg>
@@ -355,7 +338,6 @@ a { color: var(--outlook-blue); text-decoration: none; }
     </div>
   </div>
 
-  <!-- Toolbar -->
   <div class="toolbar">
     <div class="toolbar-left">
       <button class="toolbar-btn primary" id="sendReceiveBtn" onclick="sendReceive()">
@@ -377,9 +359,10 @@ a { color: var(--outlook-blue); text-decoration: none; }
     </div>
   </div>
 
-  <!-- Content -->
+  <!-- Progress bar for send/receive -->
+  <div class="send-receive-progress" id="progressBar"><div class="bar" id="progressBarInner"></div></div>
+
   <div class="content-area">
-    <!-- Sidebar -->
     <div class="sidebar">
       <div class="sidebar-account">
         <div class="account-avatar">NK</div>
@@ -391,16 +374,16 @@ a { color: var(--outlook-blue); text-decoration: none; }
       <div class="sidebar-section">
         <div class="section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg><span>Favorites</span></div>
         <ul class="folder-list" id="favFolders">
-          <li class="folder-item active" onclick="selectFolder(this,'inbox')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="folder-name">Inbox</span><span class="folder-count" id="inboxCount"></span></li>
-          <li class="folder-item" onclick="selectFolder(this,'sent')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span class="folder-name">Sent Items</span></li>
-          <li class="folder-item" onclick="selectFolder(this,'drafts')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg><span class="folder-name">Drafts</span></li>
-          <li class="folder-item" onclick="selectFolder(this,'deleted')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span class="folder-name">Deleted Items</span></li>
+          <li class="folder-item active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="folder-name">Inbox</span><span class="folder-count" id="inboxCount"></span></li>
+          <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span class="folder-name">Sent Items</span></li>
+          <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg><span class="folder-name">Drafts</span></li>
+          <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg><span class="folder-name">Deleted Items</span></li>
         </ul>
       </div>
       <div class="sidebar-section">
         <div class="section-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg><span>NareshKumar.S2@sutherlan...</span></div>
         <ul class="folder-list">
-          <li class="folder-item" onclick="selectFolder(this,'inbox')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="folder-name">Inbox</span></li>
+          <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="folder-name">Inbox</span></li>
           <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg><span class="folder-name">Drafts</span></li>
           <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span class="folder-name">Sent Items</span></li>
           <li class="folder-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg><span class="folder-name">Deleted Items</span></li>
@@ -410,7 +393,6 @@ a { color: var(--outlook-blue); text-decoration: none; }
       </div>
     </div>
 
-    <!-- Email List -->
     <div class="email-list">
       <div class="email-list-header"><h3>Inbox</h3><div class="email-list-sort">By Date</div></div>
       <div id="emailListItems" class="email-list-items">
@@ -422,13 +404,12 @@ a { color: var(--outlook-blue); text-decoration: none; }
       </div>
     </div>
 
-    <!-- Email Preview -->
     <div class="email-preview empty" id="emailPreview">
       <div class="empty-state" id="previewEmpty">
         <svg viewBox="0 0 120 100" width="120" height="100" style="opacity:0.3"><rect x="10" y="20" width="100" height="70" rx="5" fill="none" stroke="#ccc" stroke-width="2"/><path d="M10 25l50 35 50-35" fill="none" stroke="#ccc" stroke-width="2"/></svg>
         <p>Select an email to read</p>
       </div>
-      <div id="previewContent" class="preview-content-wrapper hidden-content">
+      <div id="previewContent" class="preview-content-area">
         <div class="preview-header">
           <div class="preview-actions">
             <button class="preview-action-btn" onclick="openReplyModal()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg><span>Reply</span></button>
@@ -441,16 +422,13 @@ a { color: var(--outlook-blue); text-decoration: none; }
     </div>
   </div>
 
-  <!-- Status Bar -->
   <div class="status-bar">
     <div class="status-left"><span id="statusItems">Items: 0</span><span class="status-separator">|</span><span id="statusUnread">Unread: 0</span></div>
-    <div class="status-right"><span>All folders are up to date.</span><span class="status-separator">|</span><span>Connected to Supabase</span></div>
+    <div class="status-right"><span id="statusText">All folders are up to date.</span><span class="status-separator">|</span><span>Connected to Supabase</span></div>
   </div>
 </div>
 
-<!-- ============================================
-     EMAIL POPUP OVERLAY
-     ============================================ -->
+<!-- POPUP -->
 <div id="popupOverlay" class="popup-overlay hidden" onclick="closePopup()">
   <div class="popup-window" onclick="event.stopPropagation()">
     <div class="popup-titlebar">
@@ -473,9 +451,7 @@ a { color: var(--outlook-blue); text-decoration: none; }
   </div>
 </div>
 
-<!-- ============================================
-     REPLY MODAL OVERLAY
-     ============================================ -->
+<!-- REPLY MODAL -->
 <div id="replyOverlay" class="popup-overlay hidden" onclick="closeReplyModal()">
   <div class="reply-modal" onclick="event.stopPropagation()">
     <div class="reply-modal-header">
@@ -496,26 +472,26 @@ a { color: var(--outlook-blue); text-decoration: none; }
 </div>
 
 <script>
-// ============================================
-// CONFIGURATION
-// ============================================
-const SUPABASE_URL = 'https://kgipjylhlxwtefzdqyyk.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_UJtMQmQY32xoWQElgmkV6Q_XDIWmu4H';
-const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/a9429de0-a8e0-4383-aa4b-6467e629ef0a';
+// =============================================
+// CONFIG
+// =============================================
+var SUPABASE_URL = 'https://kgipjylhlxwtefzdqyyk.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_UJtMQmQY32xoWQElgmkV6Q_XDIWmu4H';
+var N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/1876c3a6-aba8-4fe0-85a7-b459efdb9ec0';
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+var sb = null;
+try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) { console.warn('Supabase init failed:', e); }
 
-// ============================================
-// STATE
-// ============================================
-let emails = [];
-let selectedEmail = null;
-let initialized = false;
+// =============================================
+// STATE - emails stored by numeric index
+// =============================================
+var emails = [];
+var selectedIndex = -1;
 
-// ============================================
+// =============================================
 // SEED DATA
-// ============================================
-const SEED_EMAILS = [
+// =============================================
+var SEED_EMAILS = [
   {
     from_name: 'P Rahimunnisa', from_email: 'P.Rahimunnisa@sutherlandglobal.com',
     to_name: 'Underwriting Team', to_email: 'underwriting@wonderlandglobal.com',
@@ -548,70 +524,69 @@ const SEED_EMAILS = [
   }
 ];
 
-// ============================================
+// =============================================
 // HELPERS
-// ============================================
-function getInitials(name) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
+// =============================================
+function getInitials(name) { return name.split(' ').map(function(n){return n[0];}).join('').toUpperCase().slice(0,2); }
 function getAvatarColor(name) {
-  const colors = ['#0078D4','#C239B3','#E74856','#00CC6A','#F7630C','#8764B8','#00B7C3','#CA5010'];
-  let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  var colors = ['#0078D4','#C239B3','#E74856','#00CC6A','#F7630C','#8764B8','#00B7C3','#CA5010'];
+  var h = 0; for (var i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return colors[Math.abs(h) % colors.length];
 }
 function truncate(t, n) { return t.length <= n ? t : t.substring(0, n) + '...'; }
 function formatFileSize(b) { if (b < 1024) return b+' B'; if (b < 1048576) return (b/1024).toFixed(0)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
 function formatTime(d) {
-  const date = new Date(d), now = new Date(), diff = Math.floor((now - date) / 60000);
+  var date = new Date(d), now = new Date(), diff = Math.floor((now - date) / 60000);
   if (diff < 1) return 'Just now'; if (diff < 60) return diff + 'm ago';
   if (date.toDateString() === now.toDateString()) return date.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit',hour12:true});
   return date.toLocaleDateString('en-US', {month:'short',day:'numeric'});
 }
 function formatDateTime(d) {
-  const date = new Date(d);
+  var date = new Date(d);
   return date.toLocaleDateString('en-US',{weekday:'short',month:'2-digit',day:'2-digit',year:'numeric'}) + ' ' + date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
 }
 function fileIconSvg(type, size) {
-  const s = size || 20;
-  if (type.includes('pdf')) return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#D13438" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`;
-  if (type.includes('word') || type.includes('document')) return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#2B579A" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`;
-  if (type.includes('image')) return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#0078D4" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
-  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#605e5c" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  var s = size || 20;
+  if (type.indexOf('pdf') !== -1) return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="#D13438" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>';
+  if (type.indexOf('word') !== -1 || type.indexOf('document') !== -1) return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="#2B579A" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>';
+  if (type.indexOf('image') !== -1) return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="#0078D4" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+  return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="#605e5c" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>';
 }
-function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 function bodyToHtml(text) {
-  return text.split('\n').map(line => {
-    let l = escapeHtml(line);
-    const bold = ['Broker of Record (BOR) change request','Broker of Record Letter','XYZ Insurance Brokerage LLC','Cancellation Request Form','Collector Vehicle Insurance Application Form'];
-    bold.forEach(b => { const eb = escapeHtml(b); l = l.replace(eb, '<strong>'+eb+'</strong>'); });
+  return text.split('\n').map(function(line) {
+    var l = escapeHtml(line);
+    var bold = ['Broker of Record (BOR) change request','Broker of Record Letter','XYZ Insurance Brokerage LLC','Cancellation Request Form','Collector Vehicle Insurance Application Form'];
+    bold.forEach(function(b) { var eb = escapeHtml(b); l = l.replace(eb, '<strong>'+eb+'</strong>'); });
     return '<p>' + (l || '&nbsp;') + '</p>';
   }).join('');
 }
 function attCardHtml(att) {
-  const url = att.public_url || '#';
-  return `<div class="attachment-card" onclick="window.open('${escapeHtml(url)}','_blank')">
-    <div class="att-icon ${att.file_type.includes('pdf')?'pdf':att.file_type.includes('word')||att.file_type.includes('document')?'doc':att.file_type.includes('image')?'img':''}">${fileIconSvg(att.file_type, 20)}</div>
-    <div class="att-info"><span class="att-name">${escapeHtml(att.file_name)}</span><span class="att-size">${formatFileSize(att.file_size)}</span></div>
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a19f9d" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-  </div>`;
+  var iconClass = '';
+  if (att.file_type.indexOf('pdf') !== -1) iconClass = 'pdf';
+  else if (att.file_type.indexOf('word') !== -1 || att.file_type.indexOf('document') !== -1) iconClass = 'doc';
+  else if (att.file_type.indexOf('image') !== -1) iconClass = 'img';
+  return '<div class="attachment-card"><div class="att-icon '+iconClass+'">'+fileIconSvg(att.file_type, 20)+'</div><div class="att-info"><span class="att-name">'+escapeHtml(att.file_name)+'</span><span class="att-size">'+formatFileSize(att.file_size)+'</span></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a19f9d" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>';
 }
 
-// ============================================
+// =============================================
 // LOGIN
-// ============================================
+// =============================================
 function togglePassword() {
-  const p = document.getElementById('password');
+  var p = document.getElementById('password');
   p.type = p.type === 'password' ? 'text' : 'password';
 }
 document.getElementById('loginForm').addEventListener('submit', function(e) {
   e.preventDefault();
-  const u = document.getElementById('username').value;
-  const p = document.getElementById('password').value;
-  const err = document.getElementById('loginError');
-  const btn = document.getElementById('loginBtn');
-  const txt = document.getElementById('loginText');
-  const spin = document.getElementById('loginSpinner');
+  var u = document.getElementById('username').value;
+  var p = document.getElementById('password').value;
+  var err = document.getElementById('loginError');
+  var btn = document.getElementById('loginBtn');
+  var txt = document.getElementById('loginText');
+  var spin = document.getElementById('loginSpinner');
   err.classList.remove('show');
   btn.disabled = true; txt.style.display = 'none'; spin.style.display = 'block';
-  setTimeout(() => {
+  setTimeout(function() {
     if (u === 'admin' && p === 'admin') {
       sessionStorage.setItem('email_processing_auth','true');
       document.getElementById('loginPage').classList.add('hidden');
@@ -626,276 +601,475 @@ function logout() {
   sessionStorage.removeItem('email_processing_auth');
   document.getElementById('mainLayout').classList.remove('active');
   document.getElementById('loginPage').classList.remove('hidden');
-  document.getElementById('username').value = '';
-  document.getElementById('password').value = '';
 }
-// Auto-login check
 if (sessionStorage.getItem('email_processing_auth') === 'true') {
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainLayout').classList.add('active');
 }
 
-// ============================================
-// FOLDER SELECTION
-// ============================================
-function selectFolder(el, folder) {
-  document.querySelectorAll('.folder-item').forEach(f => f.classList.remove('active'));
-  el.classList.add('active');
-}
+// =============================================
+// RENDER EMAIL LIST - uses numeric index, NOT id
+// =============================================
+function renderEmailList() {
+  var container = document.getElementById('emailListItems');
+  var empty = document.getElementById('emptyState');
+  var q = document.getElementById('searchInput').value.toLowerCase();
+  var list = emails;
+  if (q) {
+    list = [];
+    for (var i = 0; i < emails.length; i++) {
+      var e = emails[i];
+      if (e.subject.toLowerCase().indexOf(q) !== -1 || e.from_name.toLowerCase().indexOf(q) !== -1 || e.body.toLowerCase().indexOf(q) !== -1) {
+        list.push({email: e, idx: i});
+      }
+    }
+  } else {
+    list = [];
+    for (var i = 0; i < emails.length; i++) { list.push({email: emails[i], idx: i}); }
+  }
 
-// ============================================
-// EMAIL LIST RENDERING
-// ============================================
-function renderEmailList(list) {
-  const container = document.getElementById('emailListItems');
-  const empty = document.getElementById('emptyState');
-  if (!list || list.length === 0) { container.innerHTML = ''; container.appendChild(empty); empty.style.display = 'flex'; return; }
+  if (list.length === 0) {
+    container.innerHTML = '';
+    container.appendChild(empty);
+    empty.style.display = 'flex';
+    return;
+  }
   empty.style.display = 'none';
-  container.innerHTML = list.map(em => `
-    <div class="email-item ${selectedEmail && selectedEmail.id === em.id ? 'selected' : ''} ${!em.is_read ? 'unread' : ''}" onclick="selectEmail('${em.id}')">
-      <div class="email-item-left">
-        <div class="email-avatar" style="background:${getAvatarColor(em.from_name)}">${getInitials(em.from_name)}</div>
-        <div class="email-unread-dot ${!em.is_read ? 'visible' : ''}"></div>
-      </div>
-      <div class="email-item-content">
-        <div class="email-item-row1">
-          <span class="email-sender ${!em.is_read ? 'bold' : ''}">${escapeHtml(em.from_name)}</span>
-          <span class="email-time">${formatTime(em.received_at)}</span>
-        </div>
-        <div class="email-item-row2"><span class="email-subject-preview ${!em.is_read ? 'bold' : ''}">${escapeHtml(truncate(em.subject, 50))}</span></div>
-        <div class="email-item-row3">
-          <span class="email-body-preview">${escapeHtml(truncate(em.body.replace(/\n/g,' '), 80))}</span>
-          <div class="email-item-icons">
-            ${em.has_attachments ? '<svg class="attachment-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>' : ''}
-            <button class="flag-btn ${em.is_flagged ? 'flagged' : ''}" onclick="event.stopPropagation();toggleFlag('${em.id}')">
-              ${em.is_flagged ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join('');
+
+  var html = '';
+  for (var j = 0; j < list.length; j++) {
+    var em = list[j].email;
+    var idx = list[j].idx;
+    var isSelected = (idx === selectedIndex);
+    var isUnread = !em.is_read;
+    html += '<div class="email-item' + (isSelected ? ' selected' : '') + (isUnread ? ' unread' : '') + '" data-idx="' + idx + '">';
+    html += '<div class="email-item-left">';
+    html += '<div class="email-avatar" style="background:' + getAvatarColor(em.from_name) + '">' + getInitials(em.from_name) + '</div>';
+    html += '<div class="email-unread-dot' + (isUnread ? ' visible' : '') + '"></div>';
+    html += '</div>';
+    html += '<div class="email-item-content">';
+    html += '<div class="email-item-row1"><span class="email-sender' + (isUnread ? ' bold' : '') + '">' + escapeHtml(em.from_name) + '</span><span class="email-time">' + formatTime(em.received_at) + '</span></div>';
+    html += '<div class="email-item-row2"><span class="email-subject-preview' + (isUnread ? ' bold' : '') + '">' + escapeHtml(truncate(em.subject, 50)) + '</span></div>';
+    html += '<div class="email-item-row3"><span class="email-body-preview">' + escapeHtml(truncate(em.body.replace(/\n/g,' '), 80)) + '</span>';
+    html += '<div class="email-item-icons">';
+    if (em.has_attachments) html += '<svg class="attachment-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+    html += '<button class="flag-btn' + (em.is_flagged ? ' flagged' : '') + '" data-flag-idx="' + idx + '">';
+    if (em.is_flagged) html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+    else html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>';
+    html += '</button></div></div></div></div>';
+  }
+  container.innerHTML = html;
   updateStatusBar();
 }
 
 function updateStatusBar() {
-  const unread = emails.filter(e => !e.is_read).length;
+  var unread = 0;
+  for (var i = 0; i < emails.length; i++) { if (!emails[i].is_read) unread++; }
   document.getElementById('statusItems').textContent = 'Items: ' + emails.length;
   document.getElementById('statusUnread').textContent = 'Unread: ' + unread;
-  const cnt = document.getElementById('inboxCount');
+  var cnt = document.getElementById('inboxCount');
   cnt.textContent = unread > 0 ? unread : '';
 }
 
-function filterEmails() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  if (!q) { renderEmailList(emails); return; }
-  renderEmailList(emails.filter(e => e.subject.toLowerCase().includes(q) || e.from_name.toLowerCase().includes(q) || e.body.toLowerCase().includes(q)));
-}
+function filterEmails() { renderEmailList(); }
 
-// ============================================
-// EMAIL SELECTION & PREVIEW
-// ============================================
-function selectEmail(id) {
-  const em = emails.find(e => e.id === id);
-  if (!em) return;
-  selectedEmail = em;
-  if (!em.is_read) {
-    em.is_read = true;
-    // Fire-and-forget DB update — don't block rendering
-    sb.from('emails').update({is_read:true}).eq('id',id).then(()=>{}).catch(e => console.warn(e));
+// =============================================
+// EVENT DELEGATION - click on email list items
+// =============================================
+document.getElementById('emailListItems').addEventListener('click', function(e) {
+  // Check for flag button click
+  var flagBtn = e.target.closest('[data-flag-idx]');
+  if (flagBtn) {
+    e.stopPropagation();
+    var flagIdx = parseInt(flagBtn.getAttribute('data-flag-idx'), 10);
+    toggleFlag(flagIdx);
+    return;
   }
-  // Render immediately (synchronous)
-  renderEmailList(document.getElementById('searchInput').value ? emails.filter(e => {const q=document.getElementById('searchInput').value.toLowerCase();return e.subject.toLowerCase().includes(q)||e.from_name.toLowerCase().includes(q)||e.body.toLowerCase().includes(q);}) : emails);
+  // Check for email item click
+  var emailItem = e.target.closest('.email-item[data-idx]');
+  if (emailItem) {
+    var idx = parseInt(emailItem.getAttribute('data-idx'), 10);
+    selectEmail(idx);
+  }
+});
+
+// =============================================
+// SELECT EMAIL - fully synchronous, uses index
+// =============================================
+function selectEmail(idx) {
+  if (idx < 0 || idx >= emails.length) return;
+  var em = emails[idx];
+  selectedIndex = idx;
+  em.is_read = true;
+
+  // 1. Show in reading pane
   renderPreview(em);
-  // Open popup like Outlook
-  openPopup();
+  // 2. Update list to show selected state
+  renderEmailList();
+  // 3. Open popup
+  openPopup(em);
+
+  // 4. Background DB update (non-blocking)
+  if (sb && em.db_id) {
+    try { sb.from('emails').update({is_read:true}).eq('id', em.db_id).then(function(){}); } catch(e) {}
+  }
 }
 
 function renderPreview(em) {
   document.getElementById('previewEmpty').style.display = 'none';
-  document.getElementById('previewContent').classList.remove('hidden-content');
+  var pc = document.getElementById('previewContent');
+  pc.classList.add('visible');
   document.getElementById('emailPreview').classList.remove('empty');
-  let html = `<h2 class="preview-subject">${escapeHtml(em.subject)}</h2>
-    <div class="preview-sender-info">
-      <div class="preview-avatar">${getInitials(em.from_name)}</div>
-      <div class="preview-sender-details">
-        <div class="preview-sender-row"><span class="preview-sender-name">${escapeHtml(em.from_name)}</span><span class="preview-sender-email">&lt;${escapeHtml(em.from_email)}&gt;</span></div>
-        <div class="preview-to-row"><span class="preview-to-label">To</span><span class="preview-to-value">${escapeHtml(em.to_name || em.to_email || '')}</span></div>
-      </div>
-      <div class="preview-date"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>${formatDateTime(em.received_at)}</span></div>
-    </div>`;
+
+  var html = '<h2 class="preview-subject">' + escapeHtml(em.subject) + '</h2>';
+  html += '<div class="preview-sender-info">';
+  html += '<div class="preview-avatar">' + getInitials(em.from_name) + '</div>';
+  html += '<div class="preview-sender-details">';
+  html += '<div class="preview-sender-row"><span class="preview-sender-name">' + escapeHtml(em.from_name) + '</span><span class="preview-sender-email">&lt;' + escapeHtml(em.from_email) + '&gt;</span></div>';
+  html += '<div class="preview-to-row"><span class="preview-to-label">To</span><span class="preview-to-value">' + escapeHtml(em.to_name || em.to_email || '') + '</span></div>';
+  html += '</div>';
+  html += '<div class="preview-date"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>' + formatDateTime(em.received_at) + '</span></div>';
+  html += '</div>';
+
   if (em.has_attachments && em.attachments && em.attachments.length) {
-    html += `<div class="preview-attachments"><div class="attachments-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span>${em.attachments.length} attachment${em.attachments.length>1?'s':''}</span></div><div class="attachments-grid">${em.attachments.map(a=>attCardHtml(a)).join('')}</div></div>`;
+    html += '<div class="preview-attachments"><div class="attachments-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span>' + em.attachments.length + ' attachment' + (em.attachments.length>1?'s':'') + '</span></div><div class="attachments-grid">';
+    for (var a = 0; a < em.attachments.length; a++) html += attCardHtml(em.attachments[a]);
+    html += '</div></div>';
   }
-  html += `<div class="preview-body">${bodyToHtml(em.body)}</div>`;
+  html += '<div class="preview-body">' + bodyToHtml(em.body) + '</div>';
+
   if (em.replies && em.replies.length) {
-    html += `<div class="preview-replies"><div class="replies-divider"><span>Replies</span></div>`;
-    em.replies.forEach(r => {
-      html += `<div class="reply-item"><div class="reply-header-line"><strong>${escapeHtml(r.from_name)}</strong> &lt;${escapeHtml(r.from_email)}&gt; &mdash; ${formatDateTime(r.sent_at)}</div><div class="reply-body-text">${bodyToHtml(r.body)}</div></div>`;
-    });
+    html += '<div class="preview-replies"><div class="replies-divider"><span>Replies</span></div>';
+    for (var r = 0; r < em.replies.length; r++) {
+      var rp = em.replies[r];
+      html += '<div class="reply-item"><div class="reply-header-line"><strong>' + escapeHtml(rp.from_name) + '</strong> &lt;' + escapeHtml(rp.from_email) + '&gt; &mdash; ' + formatDateTime(rp.sent_at) + '</div><div class="reply-body-text">' + bodyToHtml(rp.body) + '</div></div>';
+    }
     html += '</div>';
   }
   document.getElementById('previewBody').innerHTML = html;
 }
 
-// ============================================
+// =============================================
 // TOGGLE FLAG
-// ============================================
-async function toggleFlag(id) {
-  const em = emails.find(e => e.id === id);
-  if (!em) return;
-  em.is_flagged = !em.is_flagged;
-  try { await sb.from('emails').update({is_flagged:em.is_flagged}).eq('id',id); } catch(e) { console.warn(e); }
-  renderEmailList(emails);
-  if (selectedEmail && selectedEmail.id === id) renderPreview(em);
+// =============================================
+function toggleFlag(idx) {
+  if (idx < 0 || idx >= emails.length) return;
+  emails[idx].is_flagged = !emails[idx].is_flagged;
+  renderEmailList();
+  if (idx === selectedIndex) renderPreview(emails[idx]);
+  if (sb && emails[idx].db_id) {
+    try { sb.from('emails').update({is_flagged: emails[idx].is_flagged}).eq('id', emails[idx].db_id).then(function(){}); } catch(e) {}
+  }
 }
 
-// ============================================
-// SEND / RECEIVE
-// ============================================
-async function sendReceive() {
-  const btn = document.getElementById('sendReceiveBtn');
-  const icon = document.getElementById('sendReceiveIcon');
-  btn.disabled = true; icon.classList.add('spin');
+// =============================================
+// SEND / RECEIVE - 5 second delay with progress
+// =============================================
+function sendReceive() {
+  var btn = document.getElementById('sendReceiveBtn');
+  var icon = document.getElementById('sendReceiveIcon');
+  var progressEl = document.getElementById('progressBar');
+  var barEl = document.getElementById('progressBarInner');
+  var statusText = document.getElementById('statusText');
 
-  try {
-    // Check if emails exist
-    const { data: existing } = await sb.from('emails').select('id').limit(1);
-    if (!existing || existing.length === 0) {
-      // Seed emails
-      const now = new Date();
-      for (let i = 0; i < SEED_EMAILS.length; i++) {
-        const seed = SEED_EMAILS[i];
-        const receivedAt = new Date(now.getTime() - i * 60000);
-        const { data: emailData, error: insertErr } = await sb.from('emails').insert({
-          from_name: seed.from_name, from_email: seed.from_email,
-          to_name: seed.to_name, to_email: seed.to_email,
-          subject: seed.subject, body: seed.body,
-          received_at: receivedAt.toISOString(),
+  btn.disabled = true;
+  icon.classList.add('spin');
+  progressEl.classList.add('active');
+  barEl.style.width = '0%';
+  statusText.textContent = 'Connecting to mail server...';
+
+  // Animate progress bar over 5 seconds
+  var startTime = Date.now();
+  var duration = 5000;
+  var progressInterval = setInterval(function() {
+    var elapsed = Date.now() - startTime;
+    var pct = Math.min((elapsed / duration) * 100, 95);
+    barEl.style.width = pct + '%';
+
+    if (pct < 25) statusText.textContent = 'Connecting to mail server...';
+    else if (pct < 50) statusText.textContent = 'Downloading messages...';
+    else if (pct < 75) statusText.textContent = 'Processing attachments...';
+    else statusText.textContent = 'Syncing with database...';
+  }, 100);
+
+  // After 5 seconds, load emails
+  setTimeout(function() {
+    clearInterval(progressInterval);
+    barEl.style.width = '100%';
+    statusText.textContent = 'Loading emails...';
+
+    // Build local email objects
+    var now = new Date();
+    emails = [];
+    for (var i = 0; i < SEED_EMAILS.length; i++) {
+      var seed = SEED_EMAILS[i];
+      var atts = [];
+      for (var j = 0; j < seed.attachments.length; j++) {
+        atts.push({
+          file_name: seed.attachments[j].file_name,
+          file_type: seed.attachments[j].file_type,
+          file_size: seed.attachments[j].file_size,
+          public_url: null
+        });
+      }
+      emails.push({
+        db_id: null,
+        from_name: seed.from_name, from_email: seed.from_email,
+        to_name: seed.to_name, to_email: seed.to_email,
+        subject: seed.subject, body: seed.body,
+        received_at: new Date(now.getTime() - i * 60000).toISOString(),
+        is_read: false, is_flagged: false, folder: 'inbox',
+        has_attachments: seed.has_attachments,
+        attachments: atts,
+        replies: []
+      });
+    }
+
+    selectedIndex = -1;
+    renderEmailList();
+
+    // Hide progress
+    setTimeout(function() {
+      progressEl.classList.remove('active');
+      barEl.style.width = '0%';
+    }, 500);
+
+    btn.disabled = false;
+    icon.classList.remove('spin');
+    statusText.textContent = 'All folders are up to date.';
+
+    // Background: save to Supabase + trigger webhook
+    saveToSupabase();
+    triggerWebhook();
+
+  }, duration);
+}
+
+// =============================================
+// SUPABASE BACKGROUND SYNC
+// =============================================
+function saveToSupabase() {
+  if (!sb) return;
+
+  (async function() {
+    try {
+      // Check if emails already exist
+      var existRes = await sb.from('emails').select('id').limit(1);
+      if (existRes.data && existRes.data.length > 0) {
+        // Already seeded - fetch existing and update db_ids
+        var fetchRes = await sb.from('emails').select('*').eq('folder','inbox').order('received_at',{ascending:false});
+        if (fetchRes.data && fetchRes.data.length > 0) {
+          for (var i = 0; i < fetchRes.data.length && i < emails.length; i++) {
+            emails[i].db_id = fetchRes.data[i].id;
+            // Also fetch attachments and replies
+            var attRes = await sb.from('attachments').select('*').eq('email_id', fetchRes.data[i].id);
+            if (attRes.data && attRes.data.length > 0) emails[i].attachments = attRes.data;
+            var repRes = await sb.from('email_replies').select('*').eq('email_id', fetchRes.data[i].id).order('sent_at',{ascending:true});
+            if (repRes.data && repRes.data.length > 0) emails[i].replies = repRes.data;
+          }
+          renderEmailList();
+          if (selectedIndex >= 0) renderPreview(emails[selectedIndex]);
+        }
+        console.log('Loaded existing emails from Supabase');
+        return;
+      }
+
+      // Seed new emails
+      for (var i = 0; i < emails.length; i++) {
+        var em = emails[i];
+        var insertRes = await sb.from('emails').insert({
+          from_name: em.from_name, from_email: em.from_email,
+          to_name: em.to_name, to_email: em.to_email,
+          subject: em.subject, body: em.body,
+          received_at: em.received_at,
           is_read: false, is_flagged: false, folder: 'inbox',
-          has_attachments: seed.has_attachments
+          has_attachments: em.has_attachments
         }).select().single();
-        if (insertErr) { console.error(insertErr); continue; }
-        for (const att of seed.attachments) {
+
+        if (insertRes.error) { console.error('Insert error:', insertRes.error); continue; }
+        emails[i].db_id = insertRes.data.id;
+
+        for (var j = 0; j < em.attachments.length; j++) {
+          var att = em.attachments[j];
           await sb.from('attachments').insert({
-            email_id: emailData.id, file_name: att.file_name,
-            file_type: att.file_type, file_size: att.file_size,
+            email_id: insertRes.data.id,
+            file_name: att.file_name, file_type: att.file_type, file_size: att.file_size,
             storage_path: null, public_url: null
           });
         }
       }
+      console.log('Seeded ' + emails.length + ' emails to Supabase');
+    } catch(e) {
+      console.warn('Supabase sync failed (app still works):', e);
     }
+  })();
+}
 
-    // Fetch all emails
-    const { data, error: fetchErr } = await sb.from('emails').select('*').eq('folder','inbox').order('received_at',{ascending:false});
-    if (fetchErr) throw fetchErr;
-    if (data && data.length) {
-      emails = await Promise.all(data.map(async em => {
-        const [attRes, repRes] = await Promise.all([
-          sb.from('attachments').select('*').eq('email_id', em.id),
-          sb.from('email_replies').select('*').eq('email_id', em.id).order('sent_at',{ascending:true})
-        ]);
-        return { ...em, attachments: attRes.data || [], replies: repRes.data || [] };
-      }));
-    }
-    initialized = true;
-    renderEmailList(emails);
+// =============================================
+// WEBHOOK - send email data + attachment info to n8n
+// =============================================
+function triggerWebhook() {
+  var payload = {
+    event: 'emails_received',
+    timestamp: new Date().toISOString(),
+    total_emails: emails.length,
+    emails: []
+  };
 
-    // Trigger webhook
-    try {
-      await fetch(N8N_WEBHOOK_URL, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ emails: emails.map(e => ({ id:e.id, from_name:e.from_name, from_email:e.from_email, to_email:e.to_email, subject:e.subject, body:e.body, received_at:e.received_at, attachments:(e.attachments||[]).map(a=>({file_name:a.file_name,file_type:a.file_type,file_size:a.file_size,public_url:a.public_url})) })) })
+  for (var i = 0; i < emails.length; i++) {
+    var em = emails[i];
+    var attList = [];
+    for (var j = 0; j < em.attachments.length; j++) {
+      var att = em.attachments[j];
+      attList.push({
+        file_name: att.file_name,
+        file_type: att.file_type,
+        file_size: att.file_size,
+        file_size_formatted: formatFileSize(att.file_size),
+        public_url: att.public_url || null
       });
-      console.log('Webhook triggered');
-    } catch(e) { console.warn('Webhook not available:', e); }
+    }
+    payload.emails.push({
+      id: em.db_id || ('local-' + i),
+      from_name: em.from_name,
+      from_email: em.from_email,
+      to_name: em.to_name,
+      to_email: em.to_email,
+      subject: em.subject,
+      body: em.body,
+      received_at: em.received_at,
+      has_attachments: em.has_attachments,
+      attachment_count: attList.length,
+      attachments: attList
+    });
+  }
 
+  try {
+    fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function(resp) {
+      console.log('Webhook triggered successfully, status:', resp.status);
+    }).catch(function(err) {
+      console.warn('Webhook failed (n8n may not be running):', err);
+    });
   } catch(e) {
-    console.error('Send/Receive error:', e);
-    alert('Error: ' + (e.message || e));
-  } finally {
-    btn.disabled = false; icon.classList.remove('spin');
+    console.warn('Webhook error:', e);
   }
 }
 
-// ============================================
-// POPUP
-// ============================================
-function openPopup() {
-  if (!selectedEmail) return;
-  const em = selectedEmail;
+// =============================================
+// POPUP - opens with email data directly
+// =============================================
+function openPopup(em) {
+  if (!em && selectedIndex >= 0) em = emails[selectedIndex];
+  if (!em) return;
+
   document.getElementById('popupTitle').textContent = em.subject + ' - Message (HTML)';
-  let html = `<h1 class="popup-subject">${escapeHtml(em.subject)}</h1>
-    <div class="popup-sender-section">
-      <div class="popup-avatar">${getInitials(em.from_name)}</div>
-      <div class="popup-sender-info">
-        <div class="popup-sender-row"><span class="popup-sender-name">${escapeHtml(em.from_name)}</span><span class="popup-sender-email">&lt;${escapeHtml(em.from_email)}&gt;</span></div>
-        <div class="popup-to-row"><span class="popup-label">To</span><span class="popup-value">${escapeHtml(em.to_name || em.to_email || '')}</span></div>
-      </div>
-      <div class="popup-datetime">${formatDateTime(em.received_at)}</div>
-    </div>
-    <div class="popup-info-bar">If there are problems with how this message is displayed, click here to view it in a web browser.</div>`;
+  var html = '<h1 class="popup-subject">' + escapeHtml(em.subject) + '</h1>';
+  html += '<div class="popup-sender-section">';
+  html += '<div class="popup-avatar">' + getInitials(em.from_name) + '</div>';
+  html += '<div class="popup-sender-info">';
+  html += '<div class="popup-sender-row"><span class="popup-sender-name">' + escapeHtml(em.from_name) + '</span><span class="popup-sender-email">&lt;' + escapeHtml(em.from_email) + '&gt;</span></div>';
+  html += '<div class="popup-to-row"><span class="popup-label">To</span><span class="popup-value">' + escapeHtml(em.to_name || em.to_email || '') + '</span></div>';
+  html += '</div>';
+  html += '<div class="popup-datetime">' + formatDateTime(em.received_at) + '</div>';
+  html += '</div>';
+  html += '<div class="popup-info-bar">If there are problems with how this message is displayed, click here to view it in a web browser.</div>';
+
   if (em.has_attachments && em.attachments && em.attachments.length) {
-    html += `<div class="popup-attachments">${em.attachments.map(a=>attCardHtml(a)).join('')}</div>`;
-  }
-  html += `<div class="popup-body">${bodyToHtml(em.body)}</div>`;
-  if (em.replies && em.replies.length) {
-    html += `<div class="popup-replies"><div style="margin-bottom:16px"><span style="font-size:0.9rem;font-weight:600;color:var(--outlook-blue)">Responses</span></div>`;
-    em.replies.forEach(r => {
-      html += `<div class="popup-reply">
-        <div class="popup-reply-header"><strong>From:</strong> ${escapeHtml(r.from_name)} &lt;${escapeHtml(r.from_email)}&gt;</div>
-        <div class="popup-reply-header"><strong>To:</strong> ${escapeHtml(r.to_name||'')} &lt;${escapeHtml(r.to_email||'')}&gt;</div>
-        <div class="popup-reply-header"><strong>Subject:</strong> ${escapeHtml(r.subject)}</div>
-        <div class="popup-reply-header"><strong>Date:</strong> ${formatDateTime(r.sent_at)}</div>
-        <div class="popup-reply-body">${bodyToHtml(r.body)}</div>
-      </div>`;
-    });
+    html += '<div class="popup-attachments">';
+    for (var a = 0; a < em.attachments.length; a++) html += attCardHtml(em.attachments[a]);
     html += '</div>';
   }
+  html += '<div class="popup-body">' + bodyToHtml(em.body) + '</div>';
+
+  if (em.replies && em.replies.length) {
+    html += '<div class="popup-replies"><div style="margin-bottom:16px"><span style="font-size:0.9rem;font-weight:600;color:var(--outlook-blue)">Responses</span></div>';
+    for (var r = 0; r < em.replies.length; r++) {
+      var rp = em.replies[r];
+      html += '<div class="popup-reply">';
+      html += '<div class="popup-reply-header"><strong>From:</strong> ' + escapeHtml(rp.from_name) + ' &lt;' + escapeHtml(rp.from_email) + '&gt;</div>';
+      html += '<div class="popup-reply-header"><strong>To:</strong> ' + escapeHtml(rp.to_name||'') + ' &lt;' + escapeHtml(rp.to_email||'') + '&gt;</div>';
+      html += '<div class="popup-reply-header"><strong>Subject:</strong> ' + escapeHtml(rp.subject) + '</div>';
+      html += '<div class="popup-reply-header"><strong>Date:</strong> ' + formatDateTime(rp.sent_at) + '</div>';
+      html += '<div class="popup-reply-body">' + bodyToHtml(rp.body) + '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
   document.getElementById('popupContent').innerHTML = html;
   document.getElementById('popupOverlay').classList.remove('hidden');
 }
-function closePopup() { document.getElementById('popupOverlay').classList.add('hidden'); }
 
-// ============================================
+function closePopup() {
+  document.getElementById('popupOverlay').classList.add('hidden');
+}
+
+// =============================================
 // REPLY MODAL
-// ============================================
+// =============================================
 function openReplyModal() {
-  if (!selectedEmail) return;
-  const em = selectedEmail;
+  if (selectedIndex < 0 || selectedIndex >= emails.length) return;
+  var em = emails[selectedIndex];
   document.getElementById('replySubject').textContent = 'RE: ' + em.subject;
   document.getElementById('replyTo').textContent = em.from_name + ' <' + em.from_email + '>';
   document.getElementById('replySubjectLine').textContent = 'RE: ' + em.subject;
-  document.getElementById('replyBody').value = `Dear ${em.from_name},\n\nThank you for your email regarding "${em.subject}".\n\nWe have received your request and the attached documentation. Our team is currently reviewing the details and will process your request accordingly.\n\nWe will provide you with a detailed response including the extracted information and next steps within the next business day.\n\nShould you have any questions in the meantime, please do not hesitate to reach out.\n\nBest Regards,\nWonderland Team\nEmail Processing Division\nEmailprocessing@wonderlandglobal.com`;
+  document.getElementById('replyBody').value = 'Dear ' + em.from_name + ',\n\nThank you for your email regarding "' + em.subject + '".\n\nWe have received your request and the attached documentation. Our team is currently reviewing the details and will process your request accordingly.\n\nWe will provide you with a detailed response including the extracted information and next steps within the next business day.\n\nShould you have any questions in the meantime, please do not hesitate to reach out.\n\nBest Regards,\nWonderland Team\nEmail Processing Division\nEmailprocessing@wonderlandglobal.com';
   document.getElementById('replyOverlay').classList.remove('hidden');
 }
 function closeReplyModal() { document.getElementById('replyOverlay').classList.add('hidden'); }
 
-async function sendReply() {
-  if (!selectedEmail) return;
-  const btn = document.getElementById('replySendBtn');
-  btn.disabled = true; btn.querySelector('span').textContent = 'Sending...';
-  try {
-    const body = document.getElementById('replyBody').value;
-    const { data, error } = await sb.from('email_replies').insert({
-      email_id: selectedEmail.id,
-      from_name: 'Wonderland Team', from_email: 'Emailprocessing@wonderlandglobal.com',
-      to_name: selectedEmail.from_name, to_email: selectedEmail.from_email,
-      subject: 'RE: ' + selectedEmail.subject, body: body
-    }).select().single();
-    if (error) throw error;
-    if (data) {
-      if (!selectedEmail.replies) selectedEmail.replies = [];
-      selectedEmail.replies.push(data);
-      renderPreview(selectedEmail);
-    }
-    closeReplyModal();
-  } catch(e) {
-    console.error('Reply error:', e);
-    alert('Failed to send reply: ' + (e.message || e));
-  } finally {
-    btn.disabled = false; btn.querySelector('span').textContent = 'Send Reply';
+function sendReply() {
+  if (selectedIndex < 0) return;
+  var em = emails[selectedIndex];
+  var btn = document.getElementById('replySendBtn');
+  btn.disabled = true;
+  btn.querySelector('span').textContent = 'Sending...';
+
+  var body = document.getElementById('replyBody').value;
+  var replyObj = {
+    from_name: 'Wonderland Team', from_email: 'Emailprocessing@wonderlandglobal.com',
+    to_name: em.from_name, to_email: em.from_email,
+    subject: 'RE: ' + em.subject, body: body,
+    sent_at: new Date().toISOString()
+  };
+
+  // Add reply locally first
+  if (!em.replies) em.replies = [];
+  em.replies.push(replyObj);
+  renderPreview(em);
+  closeReplyModal();
+  btn.disabled = false;
+  btn.querySelector('span').textContent = 'Send Reply';
+
+  // Background: save to Supabase and trigger webhook with reply
+  if (sb && em.db_id) {
+    sb.from('email_replies').insert({
+      email_id: em.db_id,
+      from_name: replyObj.from_name, from_email: replyObj.from_email,
+      to_name: replyObj.to_name, to_email: replyObj.to_email,
+      subject: replyObj.subject, body: replyObj.body
+    }).select().single().then(function(res) {
+      if (res.data) em.replies[em.replies.length - 1] = res.data;
+    }).catch(function(e) { console.warn('Reply DB save failed:', e); });
   }
+
+  // Also send reply to webhook
+  try {
+    fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'reply_sent',
+        timestamp: new Date().toISOString(),
+        original_email: { id: em.db_id, subject: em.subject, from_name: em.from_name, from_email: em.from_email },
+        reply: replyObj
+      })
+    }).then(function(r) { console.log('Reply webhook sent'); }).catch(function(e) { console.warn('Reply webhook failed:', e); });
+  } catch(e) {}
 }
 </script>
 </body>
