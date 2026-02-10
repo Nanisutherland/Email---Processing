@@ -172,6 +172,8 @@ a { color: var(--outlook-blue); text-decoration: none; }
 .email-preview.empty { align-items: center; justify-content: center; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--text-tertiary); }
 .empty-state p { font-size: 1rem; }
+.preview-content-wrapper { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.preview-content-wrapper.hidden-content { display: none; }
 .preview-header { display: flex; align-items: center; justify-content: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
 .preview-actions { display: flex; gap: 2px; }
 .preview-action-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 4px; color: var(--text-primary); font-size: 0.82rem; transition: background 0.15s; }
@@ -426,7 +428,7 @@ a { color: var(--outlook-blue); text-decoration: none; }
         <svg viewBox="0 0 120 100" width="120" height="100" style="opacity:0.3"><rect x="10" y="20" width="100" height="70" rx="5" fill="none" stroke="#ccc" stroke-width="2"/><path d="M10 25l50 35 50-35" fill="none" stroke="#ccc" stroke-width="2"/></svg>
         <p>Select an email to read</p>
       </div>
-      <div id="previewContent" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div id="previewContent" class="preview-content-wrapper hidden-content">
         <div class="preview-header">
           <div class="preview-actions">
             <button class="preview-action-btn" onclick="openReplyModal()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg><span>Reply</span></button>
@@ -693,21 +695,25 @@ function filterEmails() {
 // ============================================
 // EMAIL SELECTION & PREVIEW
 // ============================================
-async function selectEmail(id) {
+function selectEmail(id) {
   const em = emails.find(e => e.id === id);
   if (!em) return;
   selectedEmail = em;
   if (!em.is_read) {
     em.is_read = true;
-    try { await sb.from('emails').update({is_read:true}).eq('id',id); } catch(e) { console.warn(e); }
+    // Fire-and-forget DB update — don't block rendering
+    sb.from('emails').update({is_read:true}).eq('id',id).then(()=>{}).catch(e => console.warn(e));
   }
+  // Render immediately (synchronous)
   renderEmailList(document.getElementById('searchInput').value ? emails.filter(e => {const q=document.getElementById('searchInput').value.toLowerCase();return e.subject.toLowerCase().includes(q)||e.from_name.toLowerCase().includes(q)||e.body.toLowerCase().includes(q);}) : emails);
   renderPreview(em);
+  // Open popup like Outlook
+  openPopup();
 }
 
 function renderPreview(em) {
   document.getElementById('previewEmpty').style.display = 'none';
-  document.getElementById('previewContent').style.display = 'flex';
+  document.getElementById('previewContent').classList.remove('hidden-content');
   document.getElementById('emailPreview').classList.remove('empty');
   let html = `<h2 class="preview-subject">${escapeHtml(em.subject)}</h2>
     <div class="preview-sender-info">
