@@ -906,53 +906,109 @@ function saveToSupabase() {
 }
 
 // =============================================
-// WEBHOOK - send email data + attachment info to n8n
+// WEBHOOK - send full email + attachment details to n8n
 // =============================================
+function getFileCategory(fileType) {
+  if (fileType.indexOf('pdf') !== -1) return 'pdf';
+  if (fileType.indexOf('word') !== -1 || fileType.indexOf('document') !== -1 || fileType.indexOf('docx') !== -1) return 'document';
+  if (fileType.indexOf('image') !== -1 || fileType.indexOf('heic') !== -1 || fileType.indexOf('jpg') !== -1 || fileType.indexOf('jpeg') !== -1 || fileType.indexOf('png') !== -1) return 'image';
+  if (fileType.indexOf('sheet') !== -1 || fileType.indexOf('excel') !== -1 || fileType.indexOf('csv') !== -1) return 'spreadsheet';
+  return 'other';
+}
+
+function getFileExtension(fileName) {
+  var parts = fileName.split('.');
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+}
+
 function triggerWebhook() {
   var payload = {
     event: 'emails_received',
     timestamp: new Date().toISOString(),
+    source: 'outlook-email-processing-webapp',
     total_emails: emails.length,
+    total_attachments: 0,
     emails: []
   };
+
+  var totalAttachments = 0;
 
   for (var i = 0; i < emails.length; i++) {
     var em = emails[i];
     var attList = [];
     for (var j = 0; j < em.attachments.length; j++) {
       var att = em.attachments[j];
+      var ext = getFileExtension(att.file_name);
       attList.push({
+        index: j,
         file_name: att.file_name,
+        file_extension: ext,
         file_type: att.file_type,
-        file_size: att.file_size,
+        file_category: getFileCategory(att.file_type + ' ' + ext),
+        file_size_bytes: att.file_size,
         file_size_formatted: formatFileSize(att.file_size),
+        storage_path: att.storage_path || null,
         public_url: att.public_url || null
       });
     }
+    totalAttachments += attList.length;
+
     payload.emails.push({
+      index: i,
       id: em.db_id || ('local-' + i),
+      folder: em.folder || 'inbox',
+      is_read: em.is_read,
+      is_flagged: em.is_flagged,
       from_name: em.from_name,
       from_email: em.from_email,
       to_name: em.to_name,
       to_email: em.to_email,
       subject: em.subject,
-      body: em.body,
+      body_plain: em.body,
+      body_html: bodyToHtml(em.body),
       received_at: em.received_at,
       has_attachments: em.has_attachments,
       attachment_count: attList.length,
-      attachments: attList
+      attachments: attList,
+      reply_count: (em.replies || []).length,
+      replies: (em.replies || []).map(function(r) {
+        return {
+          from_name: r.from_name,
+          from_email: r.from_email,
+          to_name: r.to_name,
+          to_email: r.to_email,
+          subject: r.subject,
+          body: r.body,
+          sent_at: r.sent_at
+        };
+      })
     });
   }
+
+  payload.total_attachments = totalAttachments;
+
+  console.log('Sending webhook to:', N8N_WEBHOOK_URL);
+  console.log('Webhook payload:', JSON.stringify(payload, null, 2));
 
   try {
     fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Source': 'outlook-email-processing',
+        'X-Event': 'emails_received'
+      },
       body: JSON.stringify(payload)
     }).then(function(resp) {
       console.log('Webhook triggered successfully, status:', resp.status);
+      if (resp.ok) {
+        document.getElementById('statusText').textContent = 'Webhook sent to n8n successfully.';
+      } else {
+        document.getElementById('statusText').textContent = 'Webhook returned status: ' + resp.status;
+      }
     }).catch(function(err) {
-      console.warn('Webhook failed (n8n may not be running):', err);
+      console.warn('Webhook failed (is n8n running?):', err);
+      document.getElementById('statusText').textContent = 'Webhook failed - check n8n is running.';
     });
   } catch(e) {
     console.warn('Webhook error:', e);
@@ -1057,19 +1113,58 @@ function sendReply() {
     }).catch(function(e) { console.warn('Reply DB save failed:', e); });
   }
 
-  // Also send reply to webhook
+  // Also send reply to webhook with full context
   try {
+    var replyAttList = [];
+    for (var ra = 0; ra < em.attachments.length; ra++) {
+      var ratt = em.attachments[ra];
+      replyAttList.push({
+        file_name: ratt.file_name,
+        file_extension: getFileExtension(ratt.file_name),
+        file_type: ratt.file_type,
+        file_category: getFileCategory(ratt.file_type + ' ' + getFileExtension(ratt.file_name)),
+        file_size_bytes: ratt.file_size,
+        file_size_formatted: formatFileSize(ratt.file_size),
+        public_url: ratt.public_url || null
+      });
+    }
     fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Source': 'outlook-email-processing',
+        'X-Event': 'reply_sent'
+      },
       body: JSON.stringify({
         event: 'reply_sent',
         timestamp: new Date().toISOString(),
-        original_email: { id: em.db_id, subject: em.subject, from_name: em.from_name, from_email: em.from_email },
-        reply: replyObj
+        source: 'outlook-email-processing-webapp',
+        original_email: {
+          id: em.db_id || ('local-' + selectedIndex),
+          from_name: em.from_name,
+          from_email: em.from_email,
+          to_name: em.to_name,
+          to_email: em.to_email,
+          subject: em.subject,
+          body_plain: em.body,
+          received_at: em.received_at,
+          has_attachments: em.has_attachments,
+          attachment_count: replyAttList.length,
+          attachments: replyAttList
+        },
+        reply: {
+          from_name: replyObj.from_name,
+          from_email: replyObj.from_email,
+          to_name: replyObj.to_name,
+          to_email: replyObj.to_email,
+          subject: replyObj.subject,
+          body_plain: replyObj.body,
+          body_html: bodyToHtml(replyObj.body),
+          sent_at: replyObj.sent_at
+        }
       })
-    }).then(function(r) { console.log('Reply webhook sent'); }).catch(function(e) { console.warn('Reply webhook failed:', e); });
-  } catch(e) {}
+    }).then(function(r) { console.log('Reply webhook sent, status:', r.status); }).catch(function(e) { console.warn('Reply webhook failed:', e); });
+  } catch(e) { console.warn('Reply webhook error:', e); }
 }
 </script>
 </body>
