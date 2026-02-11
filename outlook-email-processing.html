@@ -934,16 +934,8 @@ function getFileExtension(fileName) {
 }
 
 function triggerWebhook() {
-  var payload = {
-    event: 'emails_received',
-    timestamp: new Date().toISOString(),
-    source: 'outlook-email-processing-webapp',
-    total_emails: emails.length,
-    total_attachments: 0,
-    emails: []
-  };
-
-  var totalAttachments = 0;
+  // STEP 1: Send email metadata + file content per email (one call per email)
+  var sentCount = 0;
 
   for (var i = 0; i < emails.length; i++) {
     var em = emails[i];
@@ -959,72 +951,71 @@ function triggerWebhook() {
         file_category: getFileCategory(att.file_type + ' ' + ext),
         file_size_bytes: att.file_size,
         file_size_formatted: formatFileSize(att.file_size),
-        storage_path: att.storage_path || null,
-        public_url: att.public_url || null,
         file_content_base64: FILE_CONTENT_BASE64[att.file_name] || null
       });
     }
-    totalAttachments += attList.length;
 
-    payload.emails.push({
-      index: i,
-      id: em.db_id || ('local-' + i),
-      folder: em.folder || 'inbox',
-      is_read: em.is_read,
-      is_flagged: em.is_flagged,
-      from_name: em.from_name,
-      from_email: em.from_email,
-      to_name: em.to_name,
-      to_email: em.to_email,
-      subject: em.subject,
-      body_plain: em.body,
-      body_html: bodyToHtml(em.body),
-      received_at: em.received_at,
-      has_attachments: em.has_attachments,
-      attachment_count: attList.length,
-      attachments: attList,
-      reply_count: (em.replies || []).length,
-      replies: (em.replies || []).map(function(r) {
-        return {
-          from_name: r.from_name,
-          from_email: r.from_email,
-          to_name: r.to_name,
-          to_email: r.to_email,
-          subject: r.subject,
-          body: r.body,
-          sent_at: r.sent_at
-        };
-      })
-    });
-  }
-
-  payload.total_attachments = totalAttachments;
-
-  console.log('Sending webhook to:', N8N_WEBHOOK_URL);
-  console.log('Webhook payload:', JSON.stringify(payload, null, 2));
-
-  try {
-    fetch(N8N_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Source': 'outlook-email-processing',
-        'X-Event': 'emails_received'
-      },
-      body: JSON.stringify(payload)
-    }).then(function(resp) {
-      console.log('Webhook triggered successfully, status:', resp.status);
-      if (resp.ok) {
-        document.getElementById('statusText').textContent = 'Webhook sent to n8n successfully.';
-      } else {
-        document.getElementById('statusText').textContent = 'Webhook returned status: ' + resp.status;
+    var emailPayload = {
+      event: 'email_received',
+      timestamp: new Date().toISOString(),
+      source: 'outlook-email-processing-webapp',
+      email_index: i,
+      total_emails: emails.length,
+      email: {
+        id: em.db_id || ('local-' + i),
+        folder: em.folder || 'inbox',
+        is_read: em.is_read,
+        is_flagged: em.is_flagged,
+        from_name: em.from_name,
+        from_email: em.from_email,
+        to_name: em.to_name,
+        to_email: em.to_email,
+        subject: em.subject,
+        body_plain: em.body,
+        body_html: bodyToHtml(em.body),
+        received_at: em.received_at,
+        has_attachments: em.has_attachments,
+        attachment_count: attList.length,
+        attachments: attList,
+        reply_count: (em.replies || []).length,
+        replies: (em.replies || []).map(function(r) {
+          return { from_name: r.from_name, from_email: r.from_email, to_name: r.to_name, to_email: r.to_email, subject: r.subject, body: r.body, sent_at: r.sent_at };
+        })
       }
-    }).catch(function(err) {
-      console.warn('Webhook failed (is n8n running?):', err);
-      document.getElementById('statusText').textContent = 'Webhook failed - check n8n is running.';
-    });
-  } catch(e) {
-    console.warn('Webhook error:', e);
+    };
+
+    console.log('Sending webhook for email ' + (i + 1) + '/' + emails.length + ': ' + em.subject);
+
+    (function(idx, payload) {
+      // Small delay between calls so n8n can process each one
+      setTimeout(function() {
+        try {
+          fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Source': 'outlook-email-processing',
+              'X-Event': 'email_received',
+              'X-Email-Index': String(idx),
+              'X-Total-Emails': String(emails.length)
+            },
+            body: JSON.stringify(payload)
+          }).then(function(resp) {
+            sentCount++;
+            console.log('Webhook ' + sentCount + '/' + emails.length + ' sent, status:', resp.status);
+            if (sentCount >= emails.length) {
+              document.getElementById('statusText').textContent = 'All ' + sentCount + ' emails sent to n8n webhook.';
+            }
+          }).catch(function(err) {
+            sentCount++;
+            console.warn('Webhook failed for email ' + idx + ':', err);
+            document.getElementById('statusText').textContent = 'Webhook failed - check n8n is running.';
+          });
+        } catch(e) {
+          console.warn('Webhook error:', e);
+        }
+      }, idx * 500); // 500ms gap between each email
+    })(i, emailPayload);
   }
 }
 
