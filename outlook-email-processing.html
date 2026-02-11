@@ -934,103 +934,99 @@ function getFileExtension(fileName) {
 }
 
 function triggerWebhook() {
-  // Send emails one by one sequentially, wait for n8n "Respond to Webhook" response
+  // Send ALL emails in ONE webhook call, wait for n8n "Respond to Webhook" response
   var statusText = document.getElementById('statusText');
-  statusText.textContent = 'Processing emails via n8n workflow...';
+  statusText.textContent = 'Sending all emails to n8n for processing...';
+
+  // Build array of all emails with attachments
+  var allEmails = [];
+  for (var i = 0; i < emails.length; i++) {
+    var em = emails[i];
+    var attList = [];
+    for (var j = 0; j < em.attachments.length; j++) {
+      var att = em.attachments[j];
+      var ext = getFileExtension(att.file_name);
+      attList.push({
+        index: j,
+        file_name: att.file_name,
+        file_extension: ext,
+        file_type: att.file_type,
+        file_category: getFileCategory(att.file_type + ' ' + ext),
+        file_size_bytes: att.file_size,
+        file_size_formatted: formatFileSize(att.file_size),
+        file_content_base64: FILE_CONTENT_BASE64[att.file_name] || null
+      });
+    }
+    allEmails.push({
+      email_index: i,
+      id: em.db_id || ('local-' + i),
+      folder: em.folder || 'inbox',
+      is_read: em.is_read,
+      is_flagged: em.is_flagged,
+      from_name: em.from_name,
+      from_email: em.from_email,
+      to_name: em.to_name,
+      to_email: em.to_email,
+      subject: em.subject,
+      body_plain: em.body,
+      received_at: em.received_at,
+      has_attachments: em.has_attachments,
+      attachment_count: attList.length,
+      attachments: attList
+    });
+  }
+
+  var payload = {
+    event: 'emails_received',
+    timestamp: new Date().toISOString(),
+    source: 'outlook-email-processing-webapp',
+    total_emails: allEmails.length,
+    emails: allEmails
+  };
+
+  console.log('Sending single webhook with ' + allEmails.length + ' emails');
 
   (async function() {
-    for (var i = 0; i < emails.length; i++) {
-      var em = emails[i];
-      var attList = [];
-      for (var j = 0; j < em.attachments.length; j++) {
-        var att = em.attachments[j];
-        var ext = getFileExtension(att.file_name);
-        attList.push({
-          index: j,
-          file_name: att.file_name,
-          file_extension: ext,
-          file_type: att.file_type,
-          file_category: getFileCategory(att.file_type + ' ' + ext),
-          file_size_bytes: att.file_size,
-          file_size_formatted: formatFileSize(att.file_size),
-          file_content_base64: FILE_CONTENT_BASE64[att.file_name] || null
-        });
-      }
+    try {
+      var resp = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Source': 'outlook-email-processing',
+          'X-Event': 'emails_received'
+        },
+        body: JSON.stringify(payload)
+      });
 
-      var emailPayload = {
-        event: 'email_received',
-        timestamp: new Date().toISOString(),
-        source: 'outlook-email-processing-webapp',
-        email_index: i,
-        total_emails: emails.length,
-        email: {
-          id: em.db_id || ('local-' + i),
-          folder: em.folder || 'inbox',
-          is_read: em.is_read,
-          is_flagged: em.is_flagged,
-          from_name: em.from_name,
-          from_email: em.from_email,
-          to_name: em.to_name,
-          to_email: em.to_email,
-          subject: em.subject,
-          body_plain: em.body,
-          body_html: bodyToHtml(em.body),
-          received_at: em.received_at,
-          has_attachments: em.has_attachments,
-          attachment_count: attList.length,
-          attachments: attList,
-          reply_count: (em.replies || []).length,
-          replies: (em.replies || []).map(function(r) {
-            return { from_name: r.from_name, from_email: r.from_email, to_name: r.to_name, to_email: r.to_email, subject: r.subject, body: r.body, sent_at: r.sent_at };
-          })
-        }
-      };
+      console.log('Webhook response status:', resp.status);
 
-      statusText.textContent = 'Processing email ' + (i + 1) + '/' + emails.length + ': ' + em.subject;
-      console.log('Sending webhook for email ' + (i + 1) + '/' + emails.length + ': ' + em.subject);
+      if (resp.ok) {
+        var data = await resp.json();
+        console.log('n8n response:', data);
 
-      try {
-        var resp = await fetch(N8N_WEBHOOK_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Source': 'outlook-email-processing',
-            'X-Event': 'email_received',
-            'X-Email-Index': String(i),
-            'X-Total-Emails': String(emails.length)
-          },
-          body: JSON.stringify(emailPayload)
-        });
+        // data.results is an array of results, one per email
+        var results = data.results || [];
+        for (var r = 0; r < results.length; r++) {
+          var result = results[r];
+          var idx = result.email_index != null ? result.email_index : r;
+          if (idx < 0 || idx >= emails.length) continue;
+          var em = emails[idx];
 
-        console.log('Webhook response status for email ' + (i + 1) + ':', resp.status);
-
-        if (resp.ok) {
-          var data = await resp.json();
-          console.log('n8n response for email ' + (i + 1) + ':', data);
-
-          // Add the n8n LLM-generated reply to the email
-          if (data && data.response && data.response.body) {
+          if (result.response && result.response.body) {
             var replyObj = {
-              from_name: data.response.from_name || 'Wonderland Team',
-              from_email: data.response.from_email || 'Emailprocessing@wonderlandglobal.com',
-              to_name: data.response.to_name || em.from_name,
-              to_email: data.response.to_email || em.from_email,
-              subject: data.response.subject || ('RE: ' + em.subject),
-              body: data.response.body,
-              sent_at: data.response.sent_at || new Date().toISOString(),
-              classification: data.classification || null,
-              extracted_details: data.extracted_details || null
+              from_name: result.response.from_name || 'Wonderland Team',
+              from_email: result.response.from_email || 'Emailprocessing@wonderlandglobal.com',
+              to_name: result.response.to_name || em.from_name,
+              to_email: result.response.to_email || em.from_email,
+              subject: result.response.subject || ('RE: ' + em.subject),
+              body: result.response.body,
+              sent_at: result.response.sent_at || new Date().toISOString(),
+              classification: result.classification || null,
+              extracted_details: result.extracted_details || null
             };
 
             if (!em.replies) em.replies = [];
             em.replies.push(replyObj);
-
-            // Update the UI immediately
-            renderEmailList();
-            if (i === selectedIndex || selectedIndex < 0) {
-              if (selectedIndex < 0) selectedIndex = i;
-              renderPreview(emails[selectedIndex]);
-            }
 
             // Save reply to Supabase in background
             if (sb && em.db_id) {
@@ -1040,31 +1036,25 @@ function triggerWebhook() {
                   from_name: replyObj.from_name, from_email: replyObj.from_email,
                   to_name: replyObj.to_name, to_email: replyObj.to_email,
                   subject: replyObj.subject, body: replyObj.body
-                }).then(function() { console.log('Reply saved to Supabase'); })
-                  .catch(function(e) { console.warn('Reply DB save failed:', e); });
+                }).then(function() {}).catch(function(e) { console.warn('Reply DB save:', e); });
               } catch(e) {}
             }
-
-            statusText.textContent = 'Email ' + (i + 1) + '/' + emails.length + ' processed - ' + (data.classification ? data.classification.category : 'Classified') + ' (' + (data.extracted_details ? 'details extracted' : 'done') + ')';
-          } else {
-            statusText.textContent = 'Email ' + (i + 1) + ' processed (no reply generated).';
           }
-        } else {
-          console.warn('Webhook returned status ' + resp.status + ' for email ' + (i + 1));
-          statusText.textContent = 'Email ' + (i + 1) + ' webhook returned status ' + resp.status;
         }
-      } catch(err) {
-        console.warn('Webhook failed for email ' + (i + 1) + ':', err);
-        statusText.textContent = 'Webhook failed for email ' + (i + 1) + ' - check n8n is running.';
-      }
 
-      // Small delay between emails to let n8n process
-      if (i < emails.length - 1) {
-        await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+        // Update UI with all replies
+        renderEmailList();
+        if (selectedIndex >= 0) renderPreview(emails[selectedIndex]);
+        statusText.textContent = 'All ' + emails.length + ' emails processed. ' + results.length + ' responses received. Click an email to see the reply.';
+      } else {
+        var errText = await resp.text();
+        console.warn('Webhook returned status ' + resp.status + ':', errText);
+        statusText.textContent = 'Webhook returned status ' + resp.status + '. Check n8n workflow.';
       }
+    } catch(err) {
+      console.warn('Webhook failed:', err);
+      statusText.textContent = 'Webhook failed - check n8n is running at ' + N8N_WEBHOOK_URL;
     }
-
-    statusText.textContent = 'All ' + emails.length + ' emails processed. Check replies in each email.';
   })();
 }
 
