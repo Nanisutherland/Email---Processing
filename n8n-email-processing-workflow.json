@@ -1,5 +1,5 @@
 {
-  "name": "Email Processing - Classification & Extraction",
+  "name": "Email Processing - Two Agent Classification & Extraction",
   "nodes": [
     {
       "parameters": {
@@ -14,29 +14,29 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300],
+      "position": [200, 300],
       "webhookId": "1876c3a6-aba8-4fe0-85a7-b459efdb9ec0"
     },
     {
       "parameters": {
-        "jsCode": "// Extract all emails from the single webhook payload\nconst input = $input.first().json;\n\n// n8n Webhook may nest POST body under input.body or directly on input\nconst data = input.body || input;\n\n// Get emails array from payload\nconst emailsArray = data.emails || [];\n\nif (emailsArray.length === 0) {\n  // Fallback: maybe it was sent as single email (old format)\n  if (data.email) {\n    emailsArray.push(data.email);\n  } else {\n    throw new Error('No emails found in webhook payload. Keys: ' + Object.keys(data).join(', '));\n  }\n}\n\n// Build a single combined prompt for ALL emails - classify and extract in one LLM call\nlet emailDescriptions = '';\nlet emailMetadata = [];\n\nfor (let i = 0; i < emailsArray.length; i++) {\n  const email = emailsArray[i];\n  const attachments = (email.attachments || []).map(a => a.file_name + ' (' + (a.file_category || 'file') + ', ' + (a.file_size_formatted || 'unknown size') + ')').join(', ');\n\n  emailDescriptions += `\\n---\\nEMAIL ${i + 1}:\\nFrom: ${email.from_name} <${email.from_email}>\\nTo: ${email.to_name} <${email.to_email}>\\nSubject: ${email.subject}\\nDate: ${email.received_at}\\nBody:\\n${email.body_plain}\\nAttachments: ${attachments || 'None'}\\n`;\n\n  emailMetadata.push({\n    email_index: email.email_index != null ? email.email_index : i,\n    id: email.id,\n    from_name: email.from_name,\n    from_email: email.from_email,\n    to_name: email.to_name,\n    to_email: email.to_email,\n    subject: email.subject,\n    body_plain: email.body_plain,\n    received_at: email.received_at,\n    attachments: (email.attachments || []).map(a => ({\n      file_name: a.file_name,\n      file_category: a.file_category || 'other',\n      file_extension: a.file_extension || ''\n    }))\n  });\n}\n\nconst classificationPrompt = `You are an insurance email processing expert. You will analyze ${emailsArray.length} emails and for EACH email:\n\n1. CLASSIFY the email into exactly one category:\n   - \"BOR\" = Broker of Record change/appointment request\n   - \"Cancellation\" = Policy cancellation request\n   - \"Quote\" = New insurance quote request\n   - \"Endorsement\" = Policy change/endorsement request\n   - \"Renewal\" = Policy renewal\n   - \"Claim\" = Insurance claim\n   - \"General Inquiry\" = General question\n   - \"Other\" = Does not fit above\n\n   CLASSIFICATION RULES:\n   - If subject or body mentions \"Broker of Record\" or \"BOR\" -> category is \"BOR\"\n   - If subject or body mentions \"Cancellation\" or \"cancel\" -> category is \"Cancellation\"\n   - If subject or body mentions \"Quote\" or \"quote request\" -> category is \"Quote\"\n   - If attachment names contain \"Broker of Record\" -> supports \"BOR\"\n   - If attachment names contain \"Cancellation\" or \"Policyholder Information\" -> supports \"Cancellation\"\n   - If attachment names contain \"Insurance Application\" or \"Quote\" -> supports \"Quote\"\n\n2. EXTRACT these details from the email subject, body, and attachment names:\n   - policy_number: Look for patterns like \"Policy #XXX\", \"Policy Number: XXX\", \"#AUTO-TX-XXXX\" etc. Return the full policy number string or null.\n   - customer_id: Any customer/client ID mentioned, or null.\n   - quote_number: Any quote reference number, or null.\n   - attachment_type: Describe what the attachments are (e.g. \"BOR Letter\", \"Cancellation Form + Proof of Sale\", \"Vehicle Insurance Application\").\n   - insured_name: The person/entity being insured if mentioned, or null.\n   - effective_date: Any effective date mentioned, or null.\n   - vehicle_info: Any vehicle details (year, make, model) mentioned, or null.\n\nHere are the ${emailsArray.length} emails to analyze:\n${emailDescriptions}\n\nRespond with ONLY a valid JSON array (no markdown, no code blocks, no explanation). Each element corresponds to one email in order:\n[\n  {\n    \"email_index\": 0,\n    \"category\": \"<category>\",\n    \"confidence\": <0.0-1.0>,\n    \"policy_number\": \"<value or null>\",\n    \"customer_id\": \"<value or null>\",\n    \"quote_number\": \"<value or null>\",\n    \"attachment_type\": \"<description>\",\n    \"email_subject\": \"<subject>\",\n    \"email_body_summary\": \"<2-3 sentence summary>\",\n    \"insured_name\": \"<value or null>\",\n    \"effective_date\": \"<value or null>\",\n    \"vehicle_info\": \"<value or null>\"\n  }\n]`;\n\nreturn [{\n  json: {\n    emailMetadata,\n    classificationPrompt,\n    totalEmails: emailsArray.length\n  }\n}];"
+        "jsCode": "// ============================================================\n// STEP 1: Extract all emails and decode base64 attachments\n// ============================================================\nconst input = $input.first().json;\nconst data = input.body || input;\nconst emailsArray = data.emails || [];\n\nif (emailsArray.length === 0 && data.email) {\n  emailsArray.push(data.email);\n}\nif (emailsArray.length === 0) {\n  throw new Error('No emails found. Keys: ' + Object.keys(data).join(', '));\n}\n\n// Build Agent 1 prompt: classify from subject + body ONLY\nlet classifyInput = '';\nlet emailMetadata = [];\nlet decodedAttachments = [];\n\nfor (let i = 0; i < emailsArray.length; i++) {\n  const email = emailsArray[i];\n\n  classifyInput += `\\n===== EMAIL ${i + 1} =====\\nFrom: ${email.from_name} <${email.from_email}>\\nTo: ${email.to_name} <${email.to_email}>\\nSubject: ${email.subject}\\nBody:\\n${email.body_plain}\\n`;\n\n  // Store metadata\n  emailMetadata.push({\n    email_index: email.email_index != null ? email.email_index : i,\n    id: email.id,\n    from_name: email.from_name,\n    from_email: email.from_email,\n    to_name: email.to_name,\n    to_email: email.to_email,\n    subject: email.subject,\n    body_plain: email.body_plain,\n    received_at: email.received_at,\n    attachment_names: (email.attachments || []).map(a => a.file_name)\n  });\n\n  // Decode base64 attachments - extract readable text from binary\n  const emailAttTexts = [];\n  const attachments = email.attachments || [];\n  for (let j = 0; j < attachments.length; j++) {\n    const att = attachments[j];\n    let extractedText = '';\n    if (att.file_content_base64) {\n      try {\n        const buf = Buffer.from(att.file_content_base64, 'base64');\n        // Extract readable ASCII/UTF-8 text from binary\n        const raw = buf.toString('latin1');\n        // For PDFs: extract text between BT/ET markers and parentheses\n        const pdfTexts = [];\n        const parenRegex = /\\(([^)]{2,})\\)/g;\n        let match;\n        while ((match = parenRegex.exec(raw)) !== null) {\n          const t = match[1].replace(/\\\\n/g, '\\n').replace(/\\\\\\\\/g, '').replace(/\\\\\\(/g, '(').replace(/\\\\\\)/g, ')');\n          if (/[a-zA-Z0-9]{2,}/.test(t)) {\n            pdfTexts.push(t);\n          }\n        }\n        if (pdfTexts.length > 0) {\n          extractedText = pdfTexts.join(' ');\n        }\n        // For DOCX: extract text from XML tags\n        if (!extractedText || extractedText.length < 50) {\n          const xmlTexts = [];\n          const xmlRegex = /<w:t[^>]*>([^<]+)<\\/w:t>/g;\n          while ((match = xmlRegex.exec(raw)) !== null) {\n            if (match[1].trim()) xmlTexts.push(match[1].trim());\n          }\n          if (xmlTexts.length > 0) {\n            extractedText = xmlTexts.join(' ');\n          }\n        }\n        // Fallback: grab any readable strings of 4+ chars\n        if (!extractedText || extractedText.length < 50) {\n          const readable = raw.match(/[\\x20-\\x7E]{4,}/g) || [];\n          extractedText = readable.join(' ').substring(0, 5000);\n        }\n        // Limit to 8000 chars per attachment to stay within token limits\n        extractedText = extractedText.substring(0, 8000);\n      } catch(e) {\n        extractedText = 'Error decoding: ' + e.message;\n      }\n    } else {\n      extractedText = 'No base64 content provided';\n    }\n    emailAttTexts.push({\n      file_name: att.file_name,\n      file_type: att.file_type || '',\n      file_category: att.file_category || '',\n      extracted_text: extractedText\n    });\n  }\n  decodedAttachments.push(emailAttTexts);\n}\n\n// Agent 1 prompt: Classify scenarios\nconst classifyPrompt = `You are an insurance email triage specialist. Read the following ${emailsArray.length} emails (subject and body only) and classify each into exactly ONE scenario.\n\nSCENARIO TYPES:\n- \"BOR\" - Broker of Record: Email requests a change of broker, broker appointment, or BOR transfer\n- \"Cancellation\" - Policy Cancellation: Email requests to cancel an insurance policy\n- \"Quote\" - Quote Request: Email requests a new insurance quote or pricing\n- \"Endorsement\" - Policy endorsement or change request\n- \"Renewal\" - Policy renewal request\n- \"Claim\" - Insurance claim filing\n- \"Other\" - None of the above\n\nHOW TO CLASSIFY:\n- Look at the subject line first - it usually states the intent clearly\n- Confirm with the email body\n- \"Broker of Record\" or \"BOR\" in subject/body = BOR\n- \"Cancellation\" or \"cancel\" in subject/body = Cancellation\n- \"Quote\" in subject/body = Quote\n\nEMAILS TO CLASSIFY:\n${classifyInput}\n\nReturn ONLY a JSON array with no markdown, no code blocks, no extra text:\n[\n  { \"email_index\": 0, \"scenario\": \"<BOR|Cancellation|Quote|Endorsement|Renewal|Claim|Other>\", \"reason\": \"<one sentence why>\" }\n]`;\n\nreturn [{\n  json: {\n    emailMetadata,\n    decodedAttachments,\n    classifyPrompt,\n    totalEmails: emailsArray.length\n  }\n}];"
       },
-      "id": "prepare-all-emails",
-      "name": "Prepare All Emails",
+      "id": "prepare-data",
+      "name": "Prepare Data & Decode Base64",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [470, 300]
+      "position": [420, 300]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://eu2azeoai43.openai.azure.com/openai/deployments/gpt-5o/chat/completions?api-version=2024-08-01-preview",
+        "url": "https://eu2azeoai05.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-08-01-preview",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "api-key",
-              "value": "1AVG1OLBMStsMynFwhlvoZLO"
+              "value": "8xYxxRsOVt0dacq0LmZl0kOz"
             },
             {
               "name": "Content-Type",
@@ -46,37 +46,37 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ messages: [ { role: 'system', content: 'You are an insurance email classification and data extraction expert. You MUST respond with ONLY valid JSON. No markdown formatting, no code blocks, no backticks, no explanation text. Output raw JSON array only.' }, { role: 'user', content: $json.classificationPrompt } ], temperature: 0.1, max_tokens: 2000 }) }}",
+        "jsonBody": "={{ JSON.stringify({ messages: [{ role: 'system', content: 'You are an insurance email triage specialist. Respond with ONLY valid JSON arrays. No markdown, no code blocks, no backticks, no explanation.' }, { role: 'user', content: $json.classifyPrompt }], temperature: 0, max_tokens: 500 }) }}",
         "options": {
           "timeout": 60000
         }
       },
-      "id": "classify-all-emails",
-      "name": "Classify All Emails (Azure OpenAI)",
+      "id": "agent1-classify",
+      "name": "Agent 1 - Classify Email Scenarios",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [690, 300]
+      "position": [640, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Parse classification results and build response generation prompt\nconst input = $input.first().json;\nconst prepData = $('Prepare All Emails').first().json;\nconst emailMetadata = prepData.emailMetadata || [];\n\n// Parse Azure OpenAI classification response\nlet classifications = [];\nlet rawContent = '';\ntry {\n  const choices = input.choices || (input.body && input.body.choices) || [];\n  rawContent = choices[0].message.content;\n  let jsonStr = rawContent.trim();\n  // Strip markdown code blocks if present\n  if (jsonStr.startsWith('```')) {\n    jsonStr = jsonStr.replace(/^```(?:json)?\\s*\\n?/, '').replace(/\\n?```\\s*$/, '').trim();\n  }\n  classifications = JSON.parse(jsonStr);\n  if (!Array.isArray(classifications)) classifications = [classifications];\n} catch(e) {\n  // If parse fails, create fallback for each email\n  for (let i = 0; i < emailMetadata.length; i++) {\n    classifications.push({\n      email_index: i,\n      category: 'Unknown',\n      confidence: 0,\n      policy_number: null,\n      customer_id: null,\n      quote_number: null,\n      attachment_type: null,\n      email_subject: emailMetadata[i].subject,\n      email_body_summary: 'Classification parse error: ' + e.message + ' | Raw: ' + rawContent.substring(0, 200),\n      insured_name: null,\n      effective_date: null,\n      vehicle_info: null\n    });\n  }\n}\n\n// Build ONE prompt to generate professional responses for ALL emails\nlet responseInstructions = '';\nfor (let i = 0; i < classifications.length; i++) {\n  const c = classifications[i];\n  const meta = emailMetadata[i] || {};\n  const attNames = (meta.attachments || []).map(a => a.file_name).join(', ');\n\n  responseInstructions += `\\n---\\nEMAIL ${i + 1} (Category: ${c.category}, Confidence: ${((c.confidence || 0) * 100).toFixed(0)}%):\\nFrom: ${meta.from_name || 'Unknown'} <${meta.from_email || ''}>\\nSubject: ${meta.subject || 'No subject'}\\nSummary: ${c.email_body_summary || 'N/A'}\\nAttachments: ${attNames || 'None'}\\nExtracted Details:\\n  - Policy Number: ${c.policy_number || 'Not found'}\\n  - Customer ID: ${c.customer_id || 'Not found'}\\n  - Quote Number: ${c.quote_number || 'Not found'}\\n  - Attachment Type: ${c.attachment_type || 'Not found'}\\n  - Insured Name: ${c.insured_name || 'Not found'}\\n  - Effective Date: ${c.effective_date || 'Not found'}\\n  - Vehicle Info: ${c.vehicle_info || 'N/A'}\\n`;\n}\n\nconst responsePrompt = `You are a professional insurance operations assistant at Wonderland Global Insurance. Generate a professional response email for EACH of the ${classifications.length} emails below.\n\nFor each email response:\n1. Acknowledge receipt of the email and all attachments by name\n2. State the identified category clearly\n3. List ALL extracted details that were found (policy number, customer ID, etc.)\n4. For any details marked \"Not found\", mention that clarification may be needed\n5. Provide specific next steps based on the category:\n   - BOR: Confirm broker change processing, mention timeline\n   - Cancellation: Confirm cancellation request received, mention refund review\n   - Quote: Confirm quote application received, mention underwriting review\n6. Sign as: Wonderland Team, Email Processing Division, Emailprocessing@wonderlandglobal.com\n\nEmails to respond to:\n${responseInstructions}\n\nRespond with ONLY a valid JSON array (no markdown, no code blocks). Each element has the response text for that email:\n[\n  {\n    \"email_index\": 0,\n    \"response_body\": \"<full professional response text>\"\n  }\n]`;\n\nreturn [{\n  json: {\n    classifications,\n    emailMetadata,\n    responsePrompt\n  }\n}];"
+        "jsCode": "// ============================================================\n// Parse Agent 1 classification results\n// Build Agent 2 prompt with decoded base64 text\n// ============================================================\nconst input = $input.first().json;\nconst prepData = $('Prepare Data & Decode Base64').first().json;\nconst emailMetadata = prepData.emailMetadata;\nconst decodedAttachments = prepData.decodedAttachments;\n\n// Parse Agent 1 response\nlet classifications = [];\nlet rawContent = '';\ntry {\n  const choices = input.choices || (input.body && input.body.choices) || [];\n  rawContent = choices[0].message.content.trim();\n  let jsonStr = rawContent;\n  if (jsonStr.startsWith('```')) {\n    jsonStr = jsonStr.replace(/^```(?:json)?\\s*\\n?/, '').replace(/\\n?```\\s*$/, '').trim();\n  }\n  classifications = JSON.parse(jsonStr);\n  if (!Array.isArray(classifications)) classifications = [classifications];\n} catch(e) {\n  for (let i = 0; i < emailMetadata.length; i++) {\n    classifications.push({ email_index: i, scenario: 'Unknown', reason: 'Parse error: ' + e.message + ' | Raw: ' + rawContent.substring(0, 200) });\n  }\n}\n\n// Build Agent 2 prompt: extract key details from decoded attachment text\nlet extractionInput = '';\nfor (let i = 0; i < emailMetadata.length; i++) {\n  const meta = emailMetadata[i];\n  const atts = decodedAttachments[i] || [];\n  const scenario = (classifications[i] || {}).scenario || 'Unknown';\n\n  extractionInput += `\\n===== EMAIL ${i + 1} (Scenario: ${scenario}) =====\\nSubject: ${meta.subject}\\nBody: ${meta.body_plain}\\n`;\n\n  for (let j = 0; j < atts.length; j++) {\n    extractionInput += `\\n--- Attachment: ${atts[j].file_name} (${atts[j].file_category}) ---\\nExtracted text from file:\\n${atts[j].extracted_text}\\n`;\n  }\n}\n\nconst extractPrompt = `You are an insurance document data extraction specialist. You have ${emailMetadata.length} emails with their attachment contents (text extracted from PDF/DOCX files). For EACH email, extract the following details from the ATTACHMENT TEXT CONTENT and email body.\n\nFIELDS TO EXTRACT (return \"Not found\" if not present in the text):\n- policy_number: Any policy number (e.g. \"AUTO-TX-4589231\", \"POL-XXX\", etc.)\n- vin_number: Vehicle Identification Number (17-character alphanumeric)\n- policy_type: Type of insurance (Auto, Home, Collector Vehicle, Commercial, etc.)\n- insurance_carrier: Name of the insurance company/carrier\n- customer_id: Customer ID or client reference number\n- quote_number: Quote reference number\n- customer_name: Full name of the customer/insured/policyholder\n- license_number: Driver's license number\n- attachment_type: What kind of document each attachment is (e.g. \"BOR Letter\", \"Cancellation Form\", \"Insurance Application\")\n- email_subject: The email subject line\n- email_body_summary: 2-3 sentence summary of the email\n\nIMPORTANT: Extract values ONLY from the actual text content provided. Look carefully through the extracted attachment text for these fields. Many details are inside the attachment text, not the email body.\n\nEMAILS AND ATTACHMENTS:\n${extractionInput}\n\nReturn ONLY a JSON array with no markdown, no code blocks, no extra text:\n[\n  {\n    \"email_index\": 0,\n    \"policy_number\": \"<value or Not found>\",\n    \"vin_number\": \"<value or Not found>\",\n    \"policy_type\": \"<value or Not found>\",\n    \"insurance_carrier\": \"<value or Not found>\",\n    \"customer_id\": \"<value or Not found>\",\n    \"quote_number\": \"<value or Not found>\",\n    \"customer_name\": \"<value or Not found>\",\n    \"license_number\": \"<value or Not found>\",\n    \"attachment_type\": \"<description of attachments>\",\n    \"email_subject\": \"<subject>\",\n    \"email_body_summary\": \"<summary>\"\n  }\n]`;\n\nreturn [{\n  json: {\n    classifications,\n    emailMetadata,\n    decodedAttachments,\n    extractPrompt\n  }\n}];"
       },
-      "id": "parse-and-prepare-responses",
-      "name": "Parse & Prepare Responses",
+      "id": "parse-classify-prepare-extract",
+      "name": "Parse Classification & Prepare Extraction",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [910, 300]
+      "position": [860, 300]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://eu2azeoai43.openai.azure.com/openai/deployments/gpt-5o/chat/completions?api-version=2024-08-01-preview",
+        "url": "https://eu2azeoai05.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-08-01-preview",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "api-key",
-              "value": "1AVG1OLBMStsMynFwhlvoZLO"
+              "value": "8xYxxRsOVt0dacq0LmZl0kOz"
             },
             {
               "name": "Content-Type",
@@ -86,26 +86,66 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ messages: [ { role: 'system', content: 'You are a professional insurance operations assistant. You MUST respond with ONLY valid JSON. No markdown formatting, no code blocks, no backticks. Output raw JSON array only.' }, { role: 'user', content: $json.responsePrompt } ], temperature: 0.3, max_tokens: 3000 }) }}",
+        "jsonBody": "={{ JSON.stringify({ messages: [{ role: 'system', content: 'You are an insurance document data extraction specialist. Extract key details from document text. Respond with ONLY valid JSON arrays. No markdown, no code blocks, no backticks, no explanation.' }, { role: 'user', content: $json.extractPrompt }], temperature: 0, max_tokens: 2000 }) }}",
         "options": {
           "timeout": 60000
         }
       },
-      "id": "generate-all-responses",
-      "name": "Generate All Responses (Azure OpenAI)",
+      "id": "agent2-extract",
+      "name": "Agent 2 - Extract Details from Base64",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1130, 300]
+      "position": [1080, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Build the final webhook response with all results\nconst input = $input.first().json;\nconst prevData = $('Parse & Prepare Responses').first().json;\nconst classifications = prevData.classifications || [];\nconst emailMetadata = prevData.emailMetadata || [];\n\n// Parse generated responses\nlet responses = [];\ntry {\n  const choices = input.choices || (input.body && input.body.choices) || [];\n  let content = choices[0].message.content.trim();\n  if (content.startsWith('```')) {\n    content = content.replace(/^```(?:json)?\\s*\\n?/, '').replace(/\\n?```\\s*$/, '').trim();\n  }\n  responses = JSON.parse(content);\n  if (!Array.isArray(responses)) responses = [responses];\n} catch(e) {\n  // Fallback: generate basic responses\n  for (let i = 0; i < emailMetadata.length; i++) {\n    responses.push({\n      email_index: i,\n      response_body: 'Thank you for your email regarding \\\"' + (emailMetadata[i].subject || '') + '\\\". We have received your request and attachments. Our team is reviewing the details and will respond with next steps shortly.\\n\\nBest Regards,\\nWonderland Team\\nEmail Processing Division\\nEmailprocessing@wonderlandglobal.com'\n    });\n  }\n}\n\n// Combine everything into final results array\nconst results = [];\nfor (let i = 0; i < emailMetadata.length; i++) {\n  const meta = emailMetadata[i];\n  const classif = classifications[i] || {};\n  const resp = responses.find(r => r.email_index === i) || responses[i] || {};\n\n  results.push({\n    email_index: meta.email_index != null ? meta.email_index : i,\n    email_id: meta.id || null,\n    email_subject: meta.subject || 'Unknown',\n    classification: {\n      category: classif.category || 'Unknown',\n      confidence: classif.confidence || 0\n    },\n    extracted_details: {\n      policy_number: classif.policy_number || null,\n      customer_id: classif.customer_id || null,\n      quote_number: classif.quote_number || null,\n      attachment_type: classif.attachment_type || null,\n      insured_name: classif.insured_name || null,\n      effective_date: classif.effective_date || null,\n      vehicle_info: classif.vehicle_info || null,\n      email_subject: classif.email_subject || meta.subject || null,\n      email_body_summary: classif.email_body_summary || null\n    },\n    response: {\n      from_name: 'Wonderland Team',\n      from_email: 'Emailprocessing@wonderlandglobal.com',\n      to_name: meta.from_name || '',\n      to_email: meta.from_email || '',\n      subject: 'RE: ' + (meta.subject || ''),\n      body: resp.response_body || 'Thank you for your email. We are processing your request.',\n      sent_at: new Date().toISOString()\n    },\n    attachments_processed: (meta.attachments || []).map(a => a.file_name)\n  });\n}\n\nreturn [{\n  json: {\n    success: true,\n    total_processed: results.length,\n    processed_at: new Date().toISOString(),\n    results\n  }\n}];"
+        "jsCode": "// ============================================================\n// Combine Agent 1 + Agent 2 results\n// Build Agent 3 prompt for professional response\n// ============================================================\nconst input = $input.first().json;\nconst prevData = $('Parse Classification & Prepare Extraction').first().json;\nconst classifications = prevData.classifications;\nconst emailMetadata = prevData.emailMetadata;\n\n// Parse Agent 2 extraction results\nlet extractions = [];\nlet rawContent = '';\ntry {\n  const choices = input.choices || (input.body && input.body.choices) || [];\n  rawContent = choices[0].message.content.trim();\n  let jsonStr = rawContent;\n  if (jsonStr.startsWith('```')) {\n    jsonStr = jsonStr.replace(/^```(?:json)?\\s*\\n?/, '').replace(/\\n?```\\s*$/, '').trim();\n  }\n  extractions = JSON.parse(jsonStr);\n  if (!Array.isArray(extractions)) extractions = [extractions];\n} catch(e) {\n  for (let i = 0; i < emailMetadata.length; i++) {\n    extractions.push({\n      email_index: i, policy_number: 'Not found', vin_number: 'Not found',\n      policy_type: 'Not found', insurance_carrier: 'Not found',\n      customer_id: 'Not found', quote_number: 'Not found',\n      customer_name: 'Not found', license_number: 'Not found',\n      attachment_type: 'Not found', email_subject: emailMetadata[i].subject,\n      email_body_summary: 'Extraction parse error: ' + e.message\n    });\n  }\n}\n\n// Build combined summary for Agent 3\nlet responseSummary = '';\nfor (let i = 0; i < emailMetadata.length; i++) {\n  const meta = emailMetadata[i];\n  const classif = classifications[i] || {};\n  const extract = extractions[i] || {};\n\n  responseSummary += `\\n===== EMAIL ${i + 1} =====\\nFrom: ${meta.from_name} <${meta.from_email}>\\nSubject: ${meta.subject}\\nEmail Scenario: ${classif.scenario || 'Unknown'}\\nClassification Reason: ${classif.reason || 'N/A'}\\nAttachments: ${meta.attachment_names.join(', ')}\\n\\nExtracted Key Details:\\n- Policy Number: ${extract.policy_number || 'Not found'}\\n- VIN Number: ${extract.vin_number || 'Not found'}\\n- Policy Type: ${extract.policy_type || 'Not found'}\\n- Insurance Carrier: ${extract.insurance_carrier || 'Not found'}\\n- Customer ID: ${extract.customer_id || 'Not found'}\\n- Quote Number: ${extract.quote_number || 'Not found'}\\n- Customer Name: ${extract.customer_name || 'Not found'}\\n- License Number: ${extract.license_number || 'Not found'}\\n- Attachment Type: ${extract.attachment_type || 'Not found'}\\n`;\n}\n\nconst responsePrompt = `You are a professional insurance operations assistant at Wonderland Global Insurance. Generate a professional response email for EACH of the ${emailMetadata.length} emails below.\n\nFor each response:\n1. Address the sender by name\n2. Acknowledge receipt of their email and ALL attachments by filename\n3. State: \"Email Scenario: <scenario>\" clearly\n4. List ALL extracted key details in a clean format:\n   - Policy Number: <value>\n   - VIN Number: <value>\n   - Policy Type: <value>\n   - Insurance Carrier: <value>\n   - Customer ID: <value>\n   - Quote Number: <value>\n   - Customer Name: <value>\n   - License Number: <value>\n   - Attachment Type: <value>\n5. For items marked \"Not found\", say: \"This detail was not found in the provided documents. Please provide this information at your earliest convenience.\"\n6. Add category-specific next steps:\n   - BOR: \"Your Broker of Record change request is being processed. The transfer will be completed within 5-7 business days.\"\n   - Cancellation: \"Your cancellation request has been received. We will process the cancellation and any applicable refund will be calculated and communicated within 3-5 business days.\"\n   - Quote: \"Your quote request and application have been received. Our underwriting team will review the details and provide a quote within 2-3 business days.\"\n7. Sign as:\\n   Best Regards,\\n   Wonderland Team\\n   Email Processing Division\\n   Emailprocessing@wonderlandglobal.com\\n   Phone: (800) 555-0199\n\nEMAILS WITH CLASSIFICATION AND EXTRACTED DETAILS:\n${responseSummary}\n\nReturn ONLY a JSON array (no markdown, no code blocks):\n[\n  { \"email_index\": 0, \"response_body\": \"<full professional response>\" }\n]`;\n\nreturn [{\n  json: {\n    classifications,\n    extractions,\n    emailMetadata,\n    responsePrompt\n  }\n}];"
+      },
+      "id": "combine-and-prepare-response",
+      "name": "Combine Results & Prepare Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://eu2azeoai05.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-08-01-preview",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key",
+              "value": "8xYxxRsOVt0dacq0LmZl0kOz"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messages: [{ role: 'system', content: 'You are a professional insurance operations assistant at Wonderland Global Insurance. Write clear, professional response emails. Respond with ONLY valid JSON arrays. No markdown, no code blocks, no backticks.' }, { role: 'user', content: $json.responsePrompt }], temperature: 0.3, max_tokens: 4000 }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "agent3-response",
+      "name": "Agent 3 - Generate Professional Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Build the final webhook response to send back to HTML\n// ============================================================\nconst input = $input.first().json;\nconst prevData = $('Combine Results & Prepare Response').first().json;\nconst classifications = prevData.classifications || [];\nconst extractions = prevData.extractions || [];\nconst emailMetadata = prevData.emailMetadata || [];\n\n// Parse Agent 3 generated responses\nlet responses = [];\ntry {\n  const choices = input.choices || (input.body && input.body.choices) || [];\n  let content = choices[0].message.content.trim();\n  if (content.startsWith('```')) {\n    content = content.replace(/^```(?:json)?\\s*\\n?/, '').replace(/\\n?```\\s*$/, '').trim();\n  }\n  responses = JSON.parse(content);\n  if (!Array.isArray(responses)) responses = [responses];\n} catch(e) {\n  for (let i = 0; i < emailMetadata.length; i++) {\n    const c = classifications[i] || {};\n    responses.push({\n      email_index: i,\n      response_body: 'Dear ' + emailMetadata[i].from_name + ',\\n\\nThank you for your email regarding \"' + emailMetadata[i].subject + '\".\\n\\nEmail Scenario: ' + (c.scenario || 'Under Review') + '\\n\\nWe have received your request and attached documents. Our team is currently reviewing the details and will respond with a full assessment shortly.\\n\\nBest Regards,\\nWonderland Team\\nEmail Processing Division\\nEmailprocessing@wonderlandglobal.com\\nPhone: (800) 555-0199'\n    });\n  }\n}\n\n// Build final results array\nconst results = [];\nfor (let i = 0; i < emailMetadata.length; i++) {\n  const meta = emailMetadata[i];\n  const classif = classifications[i] || {};\n  const extract = extractions[i] || {};\n  const resp = responses.find(r => r.email_index === i) || responses[i] || {};\n\n  results.push({\n    email_index: meta.email_index != null ? meta.email_index : i,\n    email_id: meta.id || null,\n    email_subject: meta.subject,\n    classification: {\n      category: classif.scenario || 'Unknown',\n      reason: classif.reason || '',\n      confidence: classif.confidence || null\n    },\n    extracted_details: {\n      policy_number: extract.policy_number || 'Not found',\n      vin_number: extract.vin_number || 'Not found',\n      policy_type: extract.policy_type || 'Not found',\n      insurance_carrier: extract.insurance_carrier || 'Not found',\n      customer_id: extract.customer_id || 'Not found',\n      quote_number: extract.quote_number || 'Not found',\n      customer_name: extract.customer_name || 'Not found',\n      license_number: extract.license_number || 'Not found',\n      attachment_type: extract.attachment_type || 'Not found',\n      email_subject: extract.email_subject || meta.subject,\n      email_body_summary: extract.email_body_summary || ''\n    },\n    response: {\n      from_name: 'Wonderland Team',\n      from_email: 'Emailprocessing@wonderlandglobal.com',\n      to_name: meta.from_name,\n      to_email: meta.from_email,\n      subject: 'RE: ' + meta.subject,\n      body: resp.response_body || 'Thank you for your email. We are processing your request.',\n      sent_at: new Date().toISOString()\n    },\n    attachments_processed: meta.attachment_names || []\n  });\n}\n\nreturn [{\n  json: {\n    success: true,\n    total_processed: results.length,\n    processed_at: new Date().toISOString(),\n    results\n  }\n}];"
       },
       "id": "build-final-response",
       "name": "Build Final Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1350, 300]
+      "position": [1740, 300]
     },
     {
       "parameters": {
@@ -131,7 +171,7 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1570, 300]
+      "position": [1960, 300]
     }
   ],
   "connections": {
@@ -139,47 +179,69 @@
       "main": [
         [
           {
-            "node": "Prepare All Emails",
+            "node": "Prepare Data & Decode Base64",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare All Emails": {
+    "Prepare Data & Decode Base64": {
       "main": [
         [
           {
-            "node": "Classify All Emails (Azure OpenAI)",
+            "node": "Agent 1 - Classify Email Scenarios",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Classify All Emails (Azure OpenAI)": {
+    "Agent 1 - Classify Email Scenarios": {
       "main": [
         [
           {
-            "node": "Parse & Prepare Responses",
+            "node": "Parse Classification & Prepare Extraction",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse & Prepare Responses": {
+    "Parse Classification & Prepare Extraction": {
       "main": [
         [
           {
-            "node": "Generate All Responses (Azure OpenAI)",
+            "node": "Agent 2 - Extract Details from Base64",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generate All Responses (Azure OpenAI)": {
+    "Agent 2 - Extract Details from Base64": {
+      "main": [
+        [
+          {
+            "node": "Combine Results & Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Results & Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Agent 3 - Generate Professional Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 3 - Generate Professional Response": {
       "main": [
         [
           {
