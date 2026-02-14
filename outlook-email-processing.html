@@ -501,6 +501,17 @@ var FILE_CONTENT_BASE64 = {
 
 
 // =============================================
+// PRE-EXTRACTED PLAIN TEXT FROM ATTACHMENTS (for LLM processing)
+// =============================================
+var FILE_CONTENT_TEXT = {
+  'Broker of Record Letter.pdf': 'Attachment: Broker of Record Letter Policyholder Information \u2022 Insured Name: John Miller \u2022 Business / Individual: Individual \u2022 Mailing Address: 2458 Maple Street, Austin, TX 78745 \u2022 Phone Number: (512) 555-7834 \u2022 Email Address: john.miller@email.com Policy Information \u2022 Insurance Carrier: ABC Auto Insurance Company \u2022 Policy Number: AUTO-TX-4589231 \u2022 Policy Type: Personal Auto Insurance \u2022 Policy Effective Date: January 15, 2025 \u2022 Policy Expiration Date: January 15, 2026 Current Broker (Releasing Broker) \u2022 Broker Name: DEF Insurance Services \u2022 Broker Contact: support@definsurance.com New Broker of Record (Appointed Broker) \u2022 Broker Name: XYZ Insurance Brokerage LLC \u2022 Address: 1200 Broadway, Suite 900, New York, NY 10001 \u2022 Phone: (212) 555-7821 \u2022 Email: service@xyzinsurance.com BOR Effective Date \u2022 Requested Effective Date: March 1, 2026 Authorization Statement I hereby authorize ABC Auto Insurance Company to recognize XYZ Insurance Brokerage LLC as my exclusive Broker of Record for the above-referenced policy. This appointment supersedes all prior broker representations. Policyholder Signature: _______________________ Policyholder Name: John Miller Date Signed: February 25, 2026',
+  'Policyholder Information.pdf': 'Policyholder Information \u2022 Insured Name: John Miller \u2022 Address: 2458 Maple Street, Austin, TX 78745 \u2022 Phone Number: (512) 555-7834 \u2022 Email Address: john.miller@email.com Policy Information \u2022 Insurance Carrier: ABC Auto Insurance Company \u2022 Policy Number: AUTO-TX-4589231 \u2022 Policy Type: Personal Auto Insurance \u2022 Vehicle: 2021 Toyota Camry SE \u2022 VIN: 4T1G11AK5MU123456 Cancellation Details \u2022 Requested Cancellation Type: Insured Request \u2022 Requested Cancellation Effective Date: March 10, 2026 \u2022 Reason for Cancellation: Vehicle sold / Coverage obtained with another carrier Refund Instructions \u2022 Refund Method: Mail check to insured address \u2022 Lienholder: None Authorization Statement I hereby request cancellation of the above-referenced policy on the effective date noted. I understand that coverage will cease as of the cancellation date. Policyholder Signature: John Miller Date Signed: March 5, 2026',
+  'Proof of Vehicle Sale.heic': 'Image file: Proof of Vehicle Sale photograph documenting the sale of the insured vehicle.',
+  'Collector_Vehicle_Insurance_Application.pdf': 'Collector Vehicle Insurance Application Form (Sample) Applicant Information Full Name: Robert Miller Address: 1458 Woodward Avenue, Detroit, MI 48201 Phone: (313) 555-6672 Email: robert.miller@email.com Vehicle Information Year: 1967 Make: Ford Model: Mustang VIN: 7T02C123456 Vehicle Usage: Collector / Pleasure Use Annual Mileage: 2,500 miles Storage Type: Locked Private Garage Coverage Details Coverage Type: Agreed Value Agreed Vehicle Value: $45,000 Deductible: $500 Driver Information Primary Driver Name: Robert Miller Valid Driver License: Yes Years of Driving Experience: 25 Years Any Accidents in last 5 years: No Declaration I hereby declare that the information provided above is true and accurate to the best of my knowledge.',
+  'Collector Vehicle Insurance Application Form.docx': '1. Applicant Information Full Name: Robert Miller Date of Birth: March 12, 1988 Address: 2458 Maple Street, Austin, TX 78745 Phone Number: (512) 555-7834 Email Address: john.miller@email.com 2. Vehicle Information Vehicle Type: Collector / Classic Vehicle Year: 1967 Make: Ford Model: Mustang Fastback VIN: 7F02C123456 Current Market Value: $45,000 Condition: Excellent / Restored 3. Vehicle Usage and Storage Usage Type: Pleasure use only (no daily commuting) Estimated Annual Mileage: 2,500 miles Storage Type: Fully enclosed private garage Anti-Theft Devices: Steering wheel lock and garage security system 4. Ownership and History Ownership Duration: 6 years Restoration Details: Frame-off restoration completed in 2021 Modifications: Original engine restored; no performance modifications 5. Driver Information Primary Driver: John Miller Years of Driving Experience: 15 years Accidents/Violations (last 5 years): None 6. Coverage Requested Coverage Type: Agreed Value Coverage Requested Agreed Value: $45,000 Deductible: $500 Policy Term: 12 Months 7. Additional Notes Vehicle is part of a private collector collection Not used for racing or commercial purposes'
+};
+
+// =============================================
 // SEED DATA
 // =============================================
 var SEED_EMAILS = [
@@ -954,7 +965,8 @@ function triggerWebhook() {
         file_category: getFileCategory(att.file_type + ' ' + ext),
         file_size_bytes: att.file_size,
         file_size_formatted: formatFileSize(att.file_size),
-        file_content_base64: FILE_CONTENT_BASE64[att.file_name] || null
+        file_content_base64: FILE_CONTENT_BASE64[att.file_name] || null,
+        file_content_text: FILE_CONTENT_TEXT[att.file_name] || null
       });
     }
     allEmails.push({
